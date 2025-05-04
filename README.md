@@ -1,30 +1,32 @@
-# respawn-mdl
-Various structs for Respawn's models including ones unchanged from normal Source Engine (V49, V48, and more).
+# reSource Model Templates
+Various templates for respawn's reSource engine mainly focused on studio model.
 
+# Templates (current)
+Located int the 'binary_templates' folder.
 
-Many of the default Valve ones have been sourced from their public source code such as in Alien Swarm and SDK-2013, however please ask before using any Respawn related structs in any form of project.
+Studio Model:
+  - rseq (7, 7.1, 10, 11, 12)
+  - phys (valve and respawn)
+  - vertex (vvd, vvc, and vvw)
 
+Misc:
+  -pakfile (wip)
 
-Currently these templates work for:
+# Templates (legacy)
+Located in the 'structs' folder.
 
-Valve:
-
+Studio Model:
   -V47 (with original Xbox structs as well)  
   -V48  
-  -V49 (Portal 2 and Alien Swarm branches)	
-
-Respawn:
-
+  -V49 (Portal 2 and Alien Swarm branches)
   -V52  
   -V53  
-  -V54 with subversions: 8/9/10/11/12/12.1/12.2/13/14/15	
-  
-As well as structs for:
-  
+  -V54 (subversions: 8/9/10/11/12/12.1/12.2/13/14/15/16)
+
+External Files:
   -VPHY	
   -RPHY (incomplete)	
   -VTX subversions: 7	
   -VVD	
   -VVC	 
-  -VG (soon)  
-  
+  -VG (soon) 
