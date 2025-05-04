@@ -10,7 +10,7 @@ Studio Model:
   - vertex (vvd, vvc, and vvw)
 
 Misc:
-  -pakfile (wip)
+  - pakfile (wip)
 
 # Templates (legacy)
 Located in the 'structs' folder.
