@@ -1,0 +1,186 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: phys_valve.bt
+//   Authors: Rika & Others
+//   Version: 0.1
+//   Purpose: Valve Physics Files
+//  Category: Model
+// File Mask: *.phy,*.phx
+//  ID Bytes: 10 00 00 00
+//   History: 
+//------------------------------------------------
+
+
+#include "../source_math.bt"
+
+#define IVPS_MAX_DIRECTIONS		3 // xyz
+
+/* STRUCTS */
+struct phyheader_t
+{
+	int		size; // size of this data structure
+	int		id; // 0 for valve, 1 for apex's new type
+	int		solidCount; // number of surface headers
+    int		checkSum;	// checksum of source .mdl file
+};
+
+struct compactsurfaceheader_t
+{
+	int		size; // size of the content after this byte
+	int		vphysicsID;
+	short	version;
+	short	modelType;
+	int		surfaceSize;
+	Vector	dragAxisAreas;
+	int		axisMapSize;
+};
+
+struct legacysurfaceheader_t
+{
+	//int		size;
+	float	mass_center[3];
+	float	rotation_inertia[3];
+	float	upper_limit_radius;
+	unsigned int	max_factor_surface_deviation : 8;
+	int		byte_size : 24; // size of whole structure in bytes
+	int		offset_ledgetree_root;	// offset to root node of internal ledgetree
+	int		dummy[3]; // 16byte memory align
+};
+
+// taken from volt physics
+struct compactledge_t
+{
+	int c_point_offset; // byte offset from 'this' to (ledge) point array
+	// bone id in here
+	union {
+		int ledgetree_node_offset; // 32bit ssize_t
+		int client_data;	// if indicates a non terminal ledge
+	} indice;
+	unsigned int has_children_flag : 2;
+	int is_compact_flag : 2;  // if false than compact ledge uses points outside this piece of memory, tldr true for vertexes, false for none, IVP_BOOL
+	unsigned int dummy : 4;
+	unsigned int size_div_16 : 24;
+	short n_triangles;
+	short for_future_use;
+};
+
+struct compactedge_t
+{
+	unsigned int	start_point_index : 16; // point index
+	int				opposite_index : 15; // rel to this // maybe extra array, 3 bits more than tri_index/pierce_index
+	unsigned int	is_virtual : 1;
+};
+
+struct compacttriangle_t
+{
+	unsigned int tri_index : 12; // used for upward navigation
+	unsigned int pierce_index : 12;
+	unsigned int material_index : 7;
+	unsigned int is_virtual : 1;
+
+	// three edges
+	compactedge_t c_three_edges[3];
+};
+
+struct compactledgenode_t
+{
+	int offset_right_node; // (if != 0 than children
+	int offset_compact_ledge; //(if != 0, pointer to hull that contains all subelements
+	Vector center;	// in object_coords
+	float radius; // size of sphere
+	unsigned char box_sizes[IVPS_MAX_DIRECTIONS];
+	unsigned char free_0;
+};
+// end from volt physics
+
+
+/* PARSE DATA*/
+// bad code
+int GetTriVertCount(__int64 pTri, short triCount)
+{
+    local int triIdx = 0;
+    local int pointIdx = 0;
+    local int vertCount = 0;
+
+    for (triIdx = 0; triIdx < triCount; triIdx++)
+    {
+        FSeek(pTri + (sizeof(compacttriangle_t) * triIdx));
+        compacttriangle_t tri <hidden=true>;
+
+        for (pointIdx = 0; pointIdx < 3; pointIdx++)
+        {
+            vertCount = tri.c_three_edges[pointIdx].start_point_index > vertCount ? tri.c_three_edges[pointIdx].start_point_index : vertCount;
+        }
+    }
+
+    return vertCount + 1;
+}
+
+// funny node recursion struct
+struct node_group_t(int pSurfaceStart, int pNode)
+{
+    FSeek(pNode);
+    compactledgenode_t node <fgcolor=0x3f88fa>;
+    
+    local char hasChildren = false;
+
+    if (node.offset_compact_ledge)
+    {
+        FSeek(startof(node) + node.offset_compact_ledge);
+        compactledge_t ledge <fgcolor=0xaf88fa>;
+    
+        compacttriangle_t tri[ledge.n_triangles] <fgcolor=0xaf48ca>;
+    
+        local int vertCount = GetTriVertCount(startof(tri), ledge.n_triangles);
+    
+        FSeek(startof(ledge) + ledge.c_point_offset);
+        struct {
+            float x, y, z;
+            int pad<hidden=true>;
+        } vert[vertCount] <fgcolor=0xff488a>;
+
+        hasChildren = ledge.has_children_flag;
+    }
+
+    if (node.offset_right_node && !node.offset_compact_ledge)
+        hasChildren = 1;
+
+    if (hasChildren)
+    {
+        CreateIVPSNode(pSurfaceStart, pNode + sizeof(compactledgenode_t));
+        CreateIVPSNode(pSurfaceStart, pNode + node.offset_right_node);
+    }
+};
+
+// funny node recursion func
+void CreateIVPSNode(int pSurfaceStart, int pNode)
+{
+    FSeek(pSurfaceStart);
+    node_group_t node_group(pSurfaceStart, pNode);
+}
+
+phyheader_t header <bgcolor=cLtRed>;
+
+local int i = 0;
+
+for (i = 0; i < header.solidCount; i++)
+{
+    struct {
+        compactsurfaceheader_t surface <fgcolor=0x1040ff>;
+        legacysurfaceheader_t legacysurface <fgcolor=0xc0985a>;
+
+        local int nodeIdx = 0;
+        local int nodeCount = (legacysurface.byte_size - legacysurface.offset_ledgetree_root) / sizeof(compactledgenode_t); // gotta be a better way
+
+        CreateIVPSNode(startof(legacysurface), startof(legacysurface) + legacysurface.offset_ledgetree_root);
+
+        FSeek(startof(surface) + surface.size + 4); // size is size after size var (ha)
+    } solid;
+}
+
+// string data in xbox is weird, lists bone names
+string properties <fgcolor=cRed>; // null terminated
+
+// xbox has stuff after string data
+

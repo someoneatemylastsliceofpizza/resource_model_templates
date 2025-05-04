@@ -3863,21 +3863,29 @@ struct mstudiopertrivertex_t
 
 
 // struct near end of file.
-struct mstudiocollisionhdr_t
+struct mstudiocollhdr_t
 {
     int faceCount;
-    int unkCount; // quaternion, edges?
+    int faceAndUnkCount; // includes faces, and something else
     int edgeCount; // face edges
     int vertCount;
 
     int dataOffset; //
 };
 
-struct mstudiocollisionedge_t
+struct mstudiocolledge_t
 {
-    Vector vertPos[2];
-    unsigned char vertIndices[2];
+    Vector unk_0; // values are vert[0] ?
+    Vector vertDelta; // vert[0] - vert[1] 
     unsigned char faceIndices[2];
+    unsigned char vertIndices[2];
+};
+
+struct mstudiocollface_t
+{
+    // normalized
+    Vector normal;
+    float normalScale;
 };
 
 

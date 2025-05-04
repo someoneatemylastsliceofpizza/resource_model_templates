@@ -1,0 +1,513 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: rseq.bt
+//   Authors: Rika
+//   Version: 0.2
+//   Purpose: Respawn Sequence Files
+//  Category: Animation
+// File Mask: *.rseq
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+#define ANIM_VALID 0x20000
+
+#define STUDIO_ANIM_POS 0x1 // bone has pos values
+#define STUDIO_ANIM_ROT 0x2 // bone has rot values
+#define STUDIO_ANIM_SCALE 0x4 // bone has scale values
+#define STUDIO_ANIM_DATA (STUDIO_ANIM_POS | STUDIO_ANIM_ROT | STUDIO_ANIM_SCALE) // bone has animation data
+
+#define STUDIO_ANIM_ANIMSCALE 0x01 // mstudioanim_valueptr_t
+#define STUDIO_ANIM_ANIMROT 0x02 // mstudioanim_valueptr_t
+#define STUDIO_ANIM_ANIMPOS 0x04 // mstudioanim_valueptr_t
+
+struct mstudio_rle_anim_t
+{
+	short size : 13; // total size of all animation data, not next offset because even the last one has it
+	short flags : 3;
+};
+
+#define STUDIO_ANIMPTR_Z 0x01
+#define STUDIO_ANIMPTR_Y 0x02
+#define STUDIO_ANIMPTR_X 0x04
+
+
+struct mstudioanim_valueptr_t
+{
+    short offset : 13;
+    short flags : 3;
+    uint8_t axisIdx1; // these two are definitely unsigned
+    uint8_t axisIdx2;
+ };
+
+local int s_AnimSeekLUT[60] =
+{
+	1,  15, 16, 2,  7,  8,  2,  15, 0,  3,  15, 0,  4,  15, 0,  5,
+	15, 0,  6,  15, 0,  7,  15, 0,  2,  15, 2,  3,  15, 2,  4,  15,
+	2,  5,  15, 2,  6,  15, 2,  7,  15, 2,  2,  15, 4,  3,  15, 4,
+	4,  15, 4, 5, 15, 4, 6, 15, 4,  7,  15, 4
+};
+
+local char s_FrameBitCountLUT[4] = { 0, 2, 4, 0 };
+
+union mstudioanimvalue_t
+{
+	struct
+	{
+		uint8_t	valid;
+		uint8_t	total;
+	} num;
+	short value;
+};
+
+uint64_t GetAnimValueOffset(mstudioanimvalue_t& panimvalue)
+{
+    const local int valid = panimvalue.num.valid;
+    const local int total = panimvalue.num.total;
+
+    return (s_AnimSeekLUT[3 * valid] + (int)((int)(s_AnimSeekLUT[3 * valid + 1] + total * s_AnimSeekLUT[3 * valid + 2]) / 16));
+}
+
+mstudioseqdesc_t seqdesc <fgcolor=0xf0b27a, read=Str("%s", ReadString(startof(this) + this.szactivitynameindex))>;
+
+// hacky but there really is no better way to get this without the rrig or rmdl
+local int boneCount = (GetRMDLOffset(seqdesc.activitymodifierindex) - GetRMDLOffset(seqdesc.weightlistindex)) / 4;
+local int animCount = (seqdesc.groupsize[0] * seqdesc.groupsize[1]);
+
+// pose keys
+if(seqdesc.posekeyindex)
+{
+    FSeek(startof(seqdesc) + GetRMDLOffset(seqdesc.posekeyindex));
+    float posekey[seqdesc.groupsize[0] + seqdesc.groupsize[1]] <fgcolor=0x55ee00>;
+}
+
+// events
+if(seqdesc.numevents)
+{
+    FSeek(startof(seqdesc) + GetRMDLOffset(seqdesc.eventindex));
+    mstudioevent_t seqevent[seqdesc.numevents] <fgcolor=0x21fe7a, read=ReadString(startof(this) + this.szeventindex)>;
+}
+
+// auto layers
+if(seqdesc.numautolayers)
+{
+    FSeek(startof(seqdesc) + GetRMDLOffset(seqdesc.autolayerindex));
+    mstudioautolayer_t autolayers[seqdesc.numautolayers] <fgcolor=0x226600>;
+}
+
+// bone weights
+FSeek(startof(seqdesc) + GetRMDLOffset(seqdesc.weightlistindex));
+float weightlist[boneCount] <fgcolor=0xe1f27a>;
+
+// act mods
+if (seqdesc.numactivitymodifiers)
+{
+    FSeek(startof(seqdesc) + GetRMDLOffset(seqdesc.activitymodifierindex));
+    mstudioactivitymodifier_t activitymodifier[seqdesc.numactivitymodifiers] <fgcolor=0x119900, read=ReadString(startof(this) + this.sznameindex)>;
+};
+
+// animdesc offsets
+FSeek(startof(seqdesc) + GetRMDLOffset(seqdesc.animindexindex));
+
+if (useBigNumbers)
+    int blends[seqdesc.groupsize[0] * seqdesc.groupsize[1]] <fgcolor=0xffff00>;
+else
+    short blends[seqdesc.groupsize[0] * seqdesc.groupsize[1]] <fgcolor=0xffff00>;
+
+uint16_t ParseRLEAnimationOffset(const int count)
+{
+    return ((((4 * count + 7) / 8) + 1) & ~1);
+}
+
+struct rle_value
+{
+    mstudioanimvalue_t value;
+
+    switch (value.num.valid)
+    {
+    case 0:
+        short values[value.num.total];
+        break;
+    case 1:
+        short value_base;
+        char value_diff[value.num.total - 1];
+        break;
+    default:
+        local const int bitLUTIndex = ((value.num.valid - 2) / 6);
+        local const int numUnkValue = ((value.num.valid - 2) % 6);
+
+        short value_base;
+
+        short value_unk[numUnkValue];
+
+        if (bitLUTIndex)
+        {
+            struct {
+                BitfieldDisablePadding();
+                uint8_t bits : s_FrameBitCountLUT[bitLUTIndex];
+                BitfieldEnablePadding(); 
+            } value_bits[value.num.total] <optimize=false>;
+        };
+        break;
+    }
+};
+
+struct rle_valuetrack(int k)
+{
+    rle_value value;
+    FSeek(startof(value.value) + (GetAnimValueOffset(value.value) * sizeof(mstudioanimvalue_t)));
+
+    local uint8_t total = value.value.num.total;
+
+    while(total <= k)
+    {
+        rle_value value;
+        FSeek(startof(value.value) + (GetAnimValueOffset(value.value) * sizeof(mstudioanimvalue_t)));
+
+        k -= total;
+        total = value.value.num.total;
+    };
+};
+
+struct rle_valueptr(const int frameCount)
+{
+    mstudioanim_valueptr_t ptr;
+
+    local const uint64_t valoff = (startof(ptr) + ptr.offset);
+    local const uint64_t values[3] = { valoff, valoff + (ptr.axisIdx1 * sizeof(mstudioanimvalue_t)), valoff + (ptr.axisIdx2 * sizeof(mstudioanimvalue_t)) };
+
+    local int j = 0;
+    for (j = 0; j < 3; j++)
+    {
+        if (ptr.flags & (STUDIO_ANIMPTR_X >> j))
+        {
+            FSeek(values[j]);
+            
+            switch (j)
+            {
+            case 0:
+                rle_valuetrack track_x(frameCount);
+                break;
+            case 1:
+                rle_valuetrack track_y(frameCount);
+                break;
+            case 2:
+                rle_valuetrack track_z(frameCount);
+                break;
+            }
+        }
+    }
+};
+
+struct rle_bone(const uint8_t boneFlags, const int frameCount)
+{
+    mstudio_rle_anim_t header <fgcolor=0xAA3366>;
+
+    local uint64_t localPos = FTell();
+    if (boneFlags & STUDIO_ANIM_POS)
+    {
+        if (header.flags & STUDIO_ANIM_ANIMPOS)
+        {
+            float posscale <fgcolor=0x99CC99>;
+            rle_valueptr pPos(frameCount) <fgcolor=cLtGreen>;
+
+            localPos += 8;
+        }
+        else
+        {
+            Vector48 pos <fgcolor=cLtGreen>;
+
+            localPos += 6;
+        }
+    }
+
+    FSeek(localPos);
+    if (boneFlags & STUDIO_ANIM_ROT)
+    {
+        if (header.flags & STUDIO_ANIM_ANIMROT)
+        {
+            rle_valueptr pRot(frameCount) <fgcolor=cLtRed>;
+
+            localPos += 4;
+        }
+        else
+        {
+            Quaternion64 rot <fgcolor=cLtRed>;
+
+            localPos += 8;
+        }
+    }
+
+    FSeek(localPos);
+    if (boneFlags & STUDIO_ANIM_SCALE)
+    {
+        if (header.flags & STUDIO_ANIM_ANIMSCALE)
+        {
+            rle_valueptr pScale(frameCount) <fgcolor=cLtYellow>;
+        }
+        else
+        {
+            Vector48 scale <fgcolor=cLtYellow>;
+        }
+    }
+};
+
+struct rle_anim(const uint64_t baseptr, const int animindex, const int boneCount, const int frameCount)
+{
+    local const uint64_t animbase = (baseptr + animindex);
+
+    FSeek(animbase);
+    struct {
+        nibble boneFlag[boneCount] <optimize=false>;
+    } boneFlags <fgcolor=0xaa8822>;
+
+    FSeek(animbase + ParseRLEAnimationOffset(boneCount));
+
+    local int boneIdx = 0;
+    local uint8_t flags = 0;
+    for (boneIdx = 0; boneIdx < boneCount; boneIdx++)
+    {
+        flags = boneFlags.boneFlag[boneIdx].bits;
+        if (!(flags & STUDIO_ANIM_DATA))
+            continue;
+
+        rle_bone bone(flags, frameCount);
+
+        FSeek(startof(bone) + bone.header.size);
+    };
+};
+
+// da ik
+struct ikerror_section(const int frameCount)
+{
+    int16_t offsets[6] <fgcolor=0x779911>;
+
+    local int idx = 0;
+    // rotation tracks are invalid? and the game does not care or handle it, on paper this is a bug with apex.
+    // it appears on some sections there is empty animvalues, but others alignment cuts it off
+    // I bet this will be studiomdl writing offsets despite there being no data
+    for (idx = 0; idx < 3; idx++)
+    {
+        if (!offsets[idx])
+            continue;
+
+        FSeek(startof(offsets) + offsets[idx]);
+
+        switch (idx)
+        {
+        case 0:
+            rle_valuetrack track_pos_x(frameCount) <fgcolor=0x228822>;
+            break;
+        case 1:
+            rle_valuetrack track_pos_y(frameCount) <fgcolor=0x228822>;
+            break;
+        case 2:
+            rle_valuetrack track_pos_z(frameCount) <fgcolor=0x228822>;
+            break;
+        case 3:
+            rle_valuetrack track_rot_x(frameCount) <fgcolor=0x228822>;
+            break;
+        case 4:
+            rle_valuetrack track_rot_y(frameCount) <fgcolor=0x228822>;
+            break;
+        case 5:
+            rle_valuetrack track_rot_z(frameCount) <fgcolor=0x228822>;
+            break;
+        }
+    }
+};
+
+struct anim_ikrule(mstudioanimdesc_t& animdesc)
+{
+    mstudioikrule_t ikrule <fgcolor=cGreen>;
+
+    if(ikrule.compressedikerror.sectionframes)
+    {
+        FSeek(startof(ikrule) + ikrule.compressedikerrorindex);
+        struct {
+            local int sectionCount = ((float)(animdesc.numframes - 1) / (float)ikrule.compressedikerror.sectionframes) + 1;
+            local int sectionFrameCount = ikrule.compressedikerror.sectionframes;
+
+            if (useBigNumbers)
+                int sectionindices[sectionCount] <bgcolor=cDkGreen>;
+            else
+                uint16_t sectionindices[sectionCount] <bgcolor=cDkGreen>;
+
+            local int idx = 0;
+            for (idx = 0; idx < sectionCount; idx++)
+            {
+                if (idx == (sectionCount - 1))
+                    sectionFrameCount = (animdesc.numframes - 1) % ikrule.compressedikerror.sectionframes;
+
+                FSeek(startof(ikrule) + GetRMDLOffset(sectionindices[idx]));
+                ikerror_section section(sectionFrameCount);
+            };
+
+        } compressedikerror;
+    }
+
+    // supported but never seen it used
+    if(ikrule.szattachmentindex)
+    {
+        FSeek(startof(ikrule) + GetRMDLOffset(ikrule.szattachmentindex));
+        string attachment <fgcolor=cGreen>;
+    }
+};
+
+// da mover
+struct movement_section(const int frameCount)
+{
+    int16_t offsets[4] <fgcolor=0x77ccbb>;
+
+    local int idx = 0;
+    for (idx = 0; idx < 4; idx++)
+    {
+        if (!offsets[idx])
+            continue;
+
+        FSeek(startof(offsets) + offsets[idx]);
+
+        switch (idx)
+        {
+        case 0:
+            rle_valuetrack track_pos_x(frameCount) <fgcolor=0x99CC99>;
+            break;
+        case 1:
+            rle_valuetrack track_pos_y(frameCount) <fgcolor=0x99CC99>;
+            break;
+        case 2:
+            rle_valuetrack track_pos_z(frameCount) <fgcolor=0x99CC99>;
+            break;
+        case 3:
+            rle_valuetrack track_yaw(frameCount) <fgcolor=0xAADDAA>;
+            break;
+        }
+    }
+};
+
+struct anim_movement(mstudioanimdesc_t& animdesc)
+{
+    mstudioframemovement_t movement <fgcolor=0x77ccbb>;
+
+    local int sectionCount = ((float)(animdesc.numframes - 1) / (float)movement.sectionframes) + 1;
+    local int sectionFrameCount = movement.sectionframes;
+
+    if (useBigNumbers)
+        int sectionindices[sectionCount] <fgcolor=0x99ffcc>;
+    else
+        uint16_t sectionindices[sectionCount] <fgcolor=0x99ffcc>;
+
+    local int idx = 0;
+    for (idx = 0; idx < sectionCount; idx++)
+    {
+        if (idx == (sectionCount - 1))
+            sectionFrameCount = (animdesc.numframes - 1) % movement.sectionframes;
+
+        FSeek(startof(movement) + GetRMDLOffset(sectionindices[idx]));
+        movement_section section(sectionFrameCount);
+    };
+};
+
+int GetMaxFrameForSection(const int numframes, const int sectionframes, const int section, const int numSections)
+{
+    if (section == (numSections - 1))
+        return 1;
+
+    // the last full section will have less than sectionframes number of frames in most cases, doesn't seem to hurt stall style anims.
+    if (section == (numSections - 2))
+        return numframes - (section * sectionframes) - 1;
+
+    return sectionframes;
+}
+
+int GetMaxFrameForSectionStall(const int stallframes, const int sectionframes, const int section, const int numSections)
+{
+    if (section == (numSections - 1))
+        return 1;
+
+    if (stallframes > 0 && section == 0)
+        return stallframes;
+        
+    return sectionframes;
+}
+
+void ParseAnimdesc(const uint64_t baseptr, const uint16_t animindex)
+{
+    FSeek(baseptr + GetRMDLOffset(animindex));
+    struct {
+        mstudioanimdesc_t animdesc <fgcolor=0xdc7633, read=ReadString(startof(this) + this.sznameindex)>;
+
+        local int j = 0;
+
+        if (!(animdesc.flags & ANIM_VALID))
+            return;
+
+        if (animdesc.sectionframes > 0)
+        {
+            // this equation gets the max INDEX of the array, if we add one to this, we'll get the section count
+            local const int sectionCount = useStallFrameCount ?
+                ((animdesc.numframes - animdesc.sectionstallframes - 1.0f) / animdesc.sectionframes) + 3 :
+                ((animdesc.numframes - 1.0f) / animdesc.sectionframes) + 2;
+
+            local int maxFrames = 0;
+
+            FSeek(startof(animdesc) + GetRMDLOffset(animdesc.sectionindex));
+            mstudioanimsections_t sections[sectionCount] <fgcolor=cLtBlue>;
+
+            for (j = 0; j < sectionCount; j++)
+            {
+                // this section is stored externally!
+                if (useStallFrameCount)
+                {
+                    if (useBigNumbers == false && sections[j].animindex < 0)
+                        continue;
+    
+                    if (useBigNumbers == true && sections[j].isExternal == true)
+                        continue;
+                }
+
+                maxFrames = useStallFrameCount ?
+                    GetMaxFrameForSectionStall(animdesc.sectionstallframes, animdesc.sectionframes, j, sectionCount) :
+                    GetMaxFrameForSection(animdesc.numframes, animdesc.sectionframes, j, sectionCount);
+
+                FSeek(startof(animdesc) + sections[j].animindex);
+                rle_anim section(startof(animdesc), sections[j].animindex, boneCount, maxFrames);
+            };
+        }
+        else
+        {
+            FSeek(startof(animdesc) + animdesc.animindex);
+            rle_anim animation(startof(animdesc), animdesc.animindex, boneCount, animdesc.numframes - 1);
+        }
+
+        if(animdesc.numikrules)
+        {
+            for(j = 0; j < animdesc.numikrules; j++)
+            {
+                FSeek(startof(animdesc) + GetRMDLOffset(animdesc.ikruleindex) + (sizeof(mstudioikrule_t) * j));
+                anim_ikrule ikrule(animdesc);
+            }
+        }
+
+        if ((animdesc.flags & 0x40000) && animdesc.framemovementindex)
+        {
+            FSeek(startof(animdesc) + animdesc.framemovementindex);
+            anim_movement movement(animdesc);
+        }
+
+    } anim <read=ReadString(startof(this.animdesc) + this.animdesc.sznameindex)>;
+}
+
+local int i = 0;
+for(i = 0; i < animCount; i++)
+{
+    ParseAnimdesc(startof(seqdesc), blends[i]);
+}
+
+// anir thing?
+if(seqdesc.weightFixupCount)
+{
+    FSeek(startof(seqdesc) + seqdesc.weightFixupOffset);
+    mstudioseqweightfixup_t weightfixup[seqdesc.weightFixupCount] <fgcolor=0x9900BB>;
+}

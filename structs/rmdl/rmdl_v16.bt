@@ -147,6 +147,26 @@ if(hdr.keyvalueindex)
     string keyvalues_char <fgcolor=cLtBlue>;
 }
 
+if (hdr.unk7_v16)
+{
+    FSeek(startof(hdr) + GetRMDLOffset(hdr.unk8_v16));
+    struct {
+        int params;
+        Vector pos;
+        Quaternion rot;
+    } gpuBones[hdr.unk7_v16];
+}
+
+if (hdr.unk9_v16)
+{
+    FSeek(startof(hdr) + GetRMDLOffset(hdr.unk9_v16));
+    struct {
+        float vals[7];
+        int unk; // 0 or 1 observed
+    } windy;
+
+}
+
 // basically if the name is small enough to fit into 32 bytes it isn't stored in the string block
 if(hdr.sznameindex > sizeof(studiohdr_t_v16))
 {

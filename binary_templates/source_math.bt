@@ -1,0 +1,147 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: 
+//   Authors: Rika
+//   Version: 
+//   Purpose: Math :)
+//  Category: Dependancy
+// File Mask: 
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+typedef ubyte uint8;
+typedef char int8_t;
+typedef unsigned char uint8_t;
+typedef short int16_t;
+typedef unsigned short uint16_t;
+typedef int int32_t;
+typedef unsigned int uint32_t;
+typedef __int64 int64_t;
+typedef unsigned __int64 uint64_t;
+
+struct nibble
+{
+    BitfieldDisablePadding();
+    uint8_t bits : 4;
+    BitfieldEnablePadding(); 
+};
+
+__int64 Align(__int64 a, __int64 b)
+{
+    return (((a)+((b)-1)) & ~((b)-1));
+}
+
+// math stuff used by all structs.
+
+// vector
+struct Vector2D
+{
+    float x;
+    float y;
+};
+
+struct Vector
+{
+    float x;
+    float y;
+    float z;
+};
+
+typedef Vector QAngle;
+
+struct Vector4D
+{
+    float x;
+    float y;
+    float z;
+    float w;
+};
+
+// packed vector
+struct Vector32
+{
+	uint x : 10;
+	uint y : 10;
+	uint z : 10;
+	uint exp : 2;
+};
+
+struct Vector48
+{
+    hfloat x;
+    hfloat y;
+    hfloat z;
+};
+
+// quaternion
+struct Quaternion
+{
+    float x;
+    float y;
+    float z;
+    float w;
+};
+
+// packed quaternion
+struct Quaternion32
+{
+	uint x : 11 <read=Str("%f", (this - 1024) * (1 / 1024.0))>;
+	uint y : 10 <read=Str("%f", (this - 512) * (1 / 512.0))>;
+	uint z : 10 <read=Str("%f", (this - 512) * (1 / 512.0))>;
+	uint wneg : 1;
+};
+
+struct Quaternion48
+{
+	uint16 x : 16 <read=Str("%f", (this - 32768) * (1 / 32768.5))>;
+	uint16 y : 16 <read=Str("%f", (this - 32768) * (1 / 32768.5))>;
+	uint16 z : 15 <read=Str("%f", (this - 16384) * (1 / 16384.5))>; // broken
+	uint16 wneg : 1;
+};
+
+struct Quaternion64
+{
+    uint64 x : 21 <read=Str("%f", (this - 1048576) * (1 / 1048576.5))>;
+    uint64 y : 21 <read=Str("%f", (this - 1048576) * (1 / 1048576.5))>;
+    uint64 z : 21 <read=Str("%f", (this - 1048576) * (1 / 1048576.5))>;
+    uint64 wneg : 1;
+
+    //  <read=ReadShort(sqrt( 1 - x * x - y * y - z * z ))>
+};
+
+struct RadianEuler
+{
+    // for when you want radians in float.
+    float x;
+    float y;
+    float z;
+};
+
+struct matrix3x4_t
+{       //    c0         c1         c2         c3
+		float m00; float m01; float m02; float m03; // r0
+		float m10; float m11; float m12; float m13; // r1
+		float m20; float m21; float m22; float m23; // r2
+};
+
+
+
+enum <int> boolean
+{
+    False = 0,
+    True = 1,
+};
+
+/*struct bool
+{
+    byte bool;
+};*/
+
+typedef byte bool;
+
+struct VertexColor_t
+{
+	uint8 r, g, b, a;
+};

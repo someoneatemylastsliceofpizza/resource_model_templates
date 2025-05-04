@@ -1,0 +1,135 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: phys_re.bt
+//   Authors: Rika & Others
+//   Version: 0.1
+//   Purpose: Respawn Physics Files
+//  Category: Model
+// File Mask: *.phy
+//  ID Bytes: 14 00 00 00
+//   History: 
+//------------------------------------------------
+
+
+#include "../source_math.bt"
+
+/* STRUCTS */
+struct phyheader_t
+{
+	int		size;       // size of this data structure
+	int		id;         // 0 for valve, 1 for apex's new type
+	int		solidCount; // number of surface headers
+	int		checkSum;	// checksum of source .mdl file
+
+    int propertiesOffset;  // string block or size of data after this member
+};
+
+struct phyheader_v16_t
+{
+	unsigned short solidCount;     // number of surface headers
+    unsigned short propertiesOffset;   // string block or size of data after this member
+};
+
+struct phyptrheader_t
+{
+    // these are actually all 32 bit ints but with 4 extra bytes per to convert into pointers
+	__int64 solidOffset;	// offset into solids
+	__int64 solidCount;		// Number of solids in file
+	__int64 unk_0x8;
+	__int64 solidSize;		// size of all surfaces
+};
+
+struct solidgroup_t
+{
+	__int64 solidOffset; // 64bit for conversion into ptr
+    __int64 solidCount;  
+
+    float unk_0x10; // scale?? weird
+
+    int unk_0x14[3];
+
+		// idx 0, and 4 match the floats in solid_t
+    struct {
+	    float unk0x0[3];
+        int unk_0xC;
+    } unk_0x20[5]; // weird
+
+    // differs slightly from model but should be the mostly same assuming it is one solid.
+    // this is PER SOLID so on multi-solid phys this will be smaller than the models
+    Vector bbMin;
+    Vector bbMax;
+
+    char pad[8]; // padding for 16 byte alignment?
+};
+
+struct solid_t
+{
+    float unk_0x0[3]; // first might not be float
+
+    float unk_0xC;
+
+    __int64 vertOffset; // 64bit for conversion into ptr
+    __int64 vertCount;
+
+    __int64 sideOffset; // 64bit for conversion into ptr
+    __int64 sideCount;    
+
+    __int64 edgeOffset; // 64bit for conversion into ptr
+    __int64 edgeCount;  
+};
+
+struct side_t
+{
+    char vertIndices[32];
+};
+
+struct edge_t
+{
+    unsigned char vertIndices[2];
+};
+
+struct edge_v10_t
+{
+    unsigned char vertIndices[2];
+    unsigned char sideIndices[2];
+};
+
+
+/* PARSE DATA*/
+phyheader_t header <bgcolor=cLtRed>;
+phyptrheader_t ptrheader <bgcolor=cRed>;
+
+local int i = 0;
+local int solidIdx = 0;
+
+for(i = 0; i < header.solidCount; i++)
+{
+    FSeek(startof(ptrheader) + ptrheader.solidOffset + sizeof(solidgroup_t) * i);
+    struct {
+        solidgroup_t solidgroup <fgcolor=0x1040ff>;
+
+        for (solidIdx = 0; solidIdx < solidgroup.solidCount; solidIdx++)
+        {
+            struct {
+                FSeek(startof(ptrheader) + solidgroup.solidOffset + (sizeof(solid_t) * solidIdx));
+                solid_t solidhdr <fgcolor=0xc0985a>;
+        
+                FSeek(startof(ptrheader) + solidhdr.vertOffset);
+                Vector vert[solidhdr.vertCount] <fgcolor=0xff488a>;
+        
+                FSeek(startof(ptrheader) + solidhdr.sideOffset);
+                side_t sides[solidhdr.sideCount] <fgcolor=0xaf48ca>;
+        
+                FSeek(startof(ptrheader) + solidhdr.edgeOffset);
+                edge_t edges[solidhdr.edgeCount] <fgcolor=0x3f88fa>;
+            } solid;
+        }
+
+    } solidgroup;
+}
+
+//local int charSize = FileSize() - header.propertiesOffset;
+
+FSeek(header.propertiesOffset);
+string properties <fgcolor=cRed>; // null terminated

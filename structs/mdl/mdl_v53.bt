@@ -331,18 +331,18 @@ if (hdr.vphyindex || hdr.vphysize)
     vphygroup_t vphy;
 }
 
-void GenerateUnknownSections(int sectionIdx, int sectionCount, studiohdr_t_v53 &pHdr, int boneIdx)
+void GenerateCollSections(int sectionIdx, int sectionCount, studiohdr_t_v53 &pHdr, int boneIdx)
 {
     for(j = 0; j < sectionCount; j++)
     {
-        FSeek(startof(pHdr) + pHdr.unkindex + (sizeof(mstudiocollisionhdr_t) * (sectionIdx + j)));
+        FSeek(startof(pHdr) + pHdr.unkindex + (sizeof(mstudiocollhdr_t) * (sectionIdx + j)));
         struct {
-            mstudiocollisionhdr_t collisionhdr <bgcolor=cBlue>;
+            mstudiocollhdr_t collhdr <bgcolor=cBlue>;
 
-            FSeek(startof(collisionhdr) + collisionhdr.dataOffset);
-            Quaternion unkquat[collisionhdr.unkCount] <bgcolor=cLtBlue>;             
-            mstudiocollisionedge_t edge[collisionhdr.edgeCount] <bgcolor=cDkBlue>;            
-            Vector vertex[collisionhdr.vertCount] <bgcolor=cBlue>; // vertices
+            FSeek(startof(collhdr) + collhdr.dataOffset);
+            mstudiocollface_t face[collhdr.faceAndUnkCount] <bgcolor=cLtBlue>;             
+            mstudiocolledge_t edge[collhdr.edgeCount] <bgcolor=cDkBlue>;            
+            Vector vertex[collhdr.vertCount] <bgcolor=cBlue>; // vertices
         } section; // <read=Str("parent: %s", ReadString(startof(bones[boneIdx]) + bones[boneIdx].sznameindex))>
     }
 }
@@ -352,7 +352,7 @@ if (hdr.vphysize > 0)
 {
     struct {
         if(hdr.numunk)
-            GenerateUnknownSections(0, hdr.numunk, hdr, 0);
+            GenerateCollSections(0, hdr.numunk, hdr, 0);
         else
         {
             // we have to do a loop here for some edge case models with weird phys, and by weird I mean
@@ -364,10 +364,10 @@ if (hdr.vphysize > 0)
                 if(!bones[i].unkcount)
                     continue;
             
-                GenerateUnknownSections(bones[i].unkindex, bones[i].unkcount, hdr, i);
+                GenerateCollSections(bones[i].unkindex, bones[i].unkcount, hdr, i);
             }
         }
-    } unk;
+    } mapcoll;
 }
 
 
