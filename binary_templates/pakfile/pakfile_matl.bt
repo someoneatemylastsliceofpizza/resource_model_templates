@@ -1,0 +1,432 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: pakfile_matl.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Pak Files
+//  Category: Storage
+// File Mask: *.rpak
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+const uint32_t ID_MATL = 0x6C74616D;
+
+struct MaterialAssetCPU_t
+{
+	PagePtr_t data;
+	int dataSize;
+	int unk_C; // varies between shaders?
+};
+
+enum <uint8_t> MaterialShaderType_t
+{
+	RGDU = 0x0,
+	RGDP = 0x1,
+	RGDC = 0x2,
+	SKNU = 0x3,
+	SKNP = 0x4,
+	SKNC = 0x5,
+	WLDU = 0x6,
+	WLDC = 0x7,
+	PTCU = 0x8,
+	PTCS = 0x9,
+	RGBS = 0xA,
+};
+
+struct MaterialBlendState_t
+{
+	int unk : 1;
+	int blendEnable : 1;
+	int srcBlend : 5;
+	int destBlend : 5;
+	int blendOp : 3;
+	int srcBlendAlpha : 5;
+	int destBlendAlpha : 5;
+	int blendOpAlpha : 3;
+	int renderTargetWriteMask : 4;
+};
+
+struct MaterialDXState_v12_t
+{
+	// r2 only supports 4 render targets?
+	MaterialBlendState_t blendStates[4];
+
+	uint32_t blendStateMask; // [rika]: no reason this should be different than r5
+
+	// flags to determine how the D3D11_DEPTH_STENCIL_DESC is defined for this material
+	uint16_t depthStencilFlags;
+
+	// flags to determine how the D3D11_RASTERIZER_DESC is defined
+	uint16_t rasterizerFlags;
+
+    uint64_t pad <hidden = true>;
+};
+
+struct  MaterialDXState_t
+{
+	// bitfield defining a D3D11_RENDER_TARGET_BLEND_DESC for each of the 8 possible DX render targets
+	MaterialBlendState_t blendStates[8];
+
+	uint32_t blendStateMask;
+
+	// flags to determine how the D3D11_DEPTH_STENCIL_DESC is defined for this material
+	uint16_t depthStencilFlags;
+
+	// flags to determine how the D3D11_RASTERIZER_DESC is defined
+	uint16_t rasterizerFlags;
+
+	char unk_28[8]; // [rika]: there is data here in newer versions!
+};
+
+struct MaterialAssetHeader_v12_t
+{
+	uint64_t vftableReserved; // Gets set to CMaterialGlue vtbl ptr
+	char gap_8[0x8]; // unused?
+	uint64_t guid; // guid of this material asset
+
+	PagePtr_t name <read = PageString(this)>; // pointer to partial asset path
+	PagePtr_t surfaceProp <read = PageString(this)>; // pointer to surfaceprop (as defined in surfaceproperties.txt)
+	PagePtr_t surfaceProp2 <read = PageString(this)>; // pointer to surfaceprop2 
+
+	uint64_t depthShadowMaterial;
+	uint64_t depthPrepassMaterial;
+	uint64_t depthVSMMaterial;
+	uint64_t colpassMaterial;
+
+	MaterialDXState_v12_t dxStates[2];
+
+	uint64_t shaderSet; // guid of the shaderset asset that this material uses
+
+	PagePtr_t textureHandles; // TextureGUID Map
+	PagePtr_t streamingTextureHandles; // Streamable TextureGUID Map
+	short numStreamingTextureHandles; // Number of textures with streamed mip levels.
+
+	char samplers[4]; // 0x503000
+
+	short unk_AE;
+	uint64_t unk_B0; // haven't observed anything here.
+
+	// seems to be 0xFBA63181 for loadscreens
+	uint32_t unk_B8; // no clue tbh, 0xFBA63181
+
+	uint32_t unk_BC; // this might actually be "Alignment"
+
+	uint32_t glueFlags;
+	uint32_t glueFlags2;
+
+	short width;
+	short height;
+	short depth;
+};
+
+struct MaterialAssetHeader_v15_t
+{
+	uint64_t vftableReserved; // reserved for virtual function table pointer (when copied into native CMaterialGlue)
+
+	char gap_8[0x8]; // unused?
+	uint64_t guid; // guid of this material asset
+
+	PagePtr_t name; // pointer to partial asset path
+	PagePtr_t surfaceProp; // pointer to surfaceprop (as defined in surfaceproperties.rson)
+	PagePtr_t surfaceProp2; // pointer to surfaceprop2 
+
+	uint64_t depthShadowMaterial;
+	uint64_t depthPrepassMaterial;
+	uint64_t depthVSMMaterial;
+	uint64_t depthShadowTightMaterial;
+	uint64_t colpassMaterial;
+
+	uint64_t shaderSet; // guid of the shaderset asset that this material uses
+
+	PagePtr_t textureHandles; // ptr to array of texture guids
+	PagePtr_t streamingTextureHandles; // ptr to array of streamable texture guids (empty at build time)
+
+	short numStreamingTextureHandles; // number of textures with streamed mip levels.
+	short width;
+	short height;
+	short depth;
+
+	// array of indices into sampler states array. must be set properly to have accurate texture tiling
+	// used in CShaderGlue::SetupShader (1403B3C60)
+	char samplers[4];// = 0x1D0300;
+
+	uint32_t unk_7C;
+
+	uint32_t unk_80;// = 0x1F5A92BD; // REQUIRED but why?
+
+	uint32_t unk_84;
+
+	uint32_t glueFlags;
+	uint32_t glueFlags2;
+
+	MaterialDXState_t dxStates[2]; // seems to be used for setting up some D3D states?
+
+	uint16_t numAnimationFrames; // used in CMaterialGlue::GetNumAnimationFrames (0x1403B4250), which is called from GetSpriteInfo @ 0x1402561FC
+	MaterialShaderType_t materialType;
+	uint8_t uberBufferFlags; // used for unksections loading in UpdateMaterialAsset
+
+	char pad_00F4[0x4];
+
+	uint64_t textureAnimation;
+};
+
+// [rika]: I think we're on version 23 of matl now and this still works. v22 and v23 are 256 bytes, everything else is below is the same?
+struct MaterialAssetHeader_v16_t
+{
+	uint64_t vftableReserved; // reserved for virtual function table pointer (when copied into native CMaterialGlue)
+
+	char gap_8[0x8]; // unused?
+	uint64_t guid; // guid of this material asset
+
+	PagePtr_t name; // pointer to partial asset path
+	PagePtr_t surfaceProp; // pointer to surfaceprop (as defined in surfaceproperties.rson)
+	PagePtr_t surfaceProp2; // pointer to surfaceprop2 
+
+	uint64_t depthShadowMaterial;
+	uint64_t depthPrepassMaterial;
+	uint64_t depthVSMMaterial;
+	uint64_t depthShadowTightMaterial;
+	uint64_t colpassMaterial;
+
+	uint64_t shaderSet; // guid of the shaderset asset that this material uses
+
+	PagePtr_t textureHandles; // ptr to array of texture guids
+	PagePtr_t streamingTextureHandles; // ptr to array of streamable texture guids (empty at build time)
+
+	short numStreamingTextureHandles; // number of textures with streamed mip levels.
+	short width;
+	short height;
+	short depth;
+
+	// array of indices into sampler states array. must be set properly to have accurate texture tiling
+	// used in CShaderGlue::SetupShader (1403B3C60)
+	char samplers[4];// = 0x1D0300;
+
+	uint32_t unk_7C;
+
+	uint32_t unk_80;// = 0x1F5A92BD; // REQUIRED but why?
+
+	uint32_t unk_84;
+
+	uint32_t glueFlags;
+	uint32_t glueFlags2;
+
+	MaterialDXState_t dxStates; // seems to be used for setting up some D3D states?
+
+	int unk_C0[2];
+
+	uint16_t numAnimationFrames; // used in CMaterialGlue::GetNumAnimationFrames (0x1403B4250), which is called from GetSpriteInfo @ 0x1402561FC
+	MaterialShaderType_t materialType;
+	uint8_t uberBufferFlags; // used for unksections loading in UpdateMaterialAsset
+
+	int unk_CC;
+
+	uint64_t textureAnimation;
+
+	int unk_D8[4];
+
+    float unk_E8[2]; // 2nd may not be float
+
+};
+
+struct MaterialAssetHeader_v22_t
+{
+	uint64_t vftableReserved; // reserved for virtual function table pointer (when copied into native CMaterialGlue)
+
+	char gap_8[0x8]; // unused?
+	uint64_t guid; // guid of this material asset
+
+	PagePtr_t name; // pointer to partial asset path
+	PagePtr_t surfaceProp; // pointer to surfaceprop (as defined in surfaceproperties.rson)
+	PagePtr_t surfaceProp2; // pointer to surfaceprop2 
+
+	uint64_t depthShadowMaterial;
+	uint64_t depthPrepassMaterial;
+	uint64_t depthVSMMaterial;
+	uint64_t depthShadowTightMaterial;
+	uint64_t colpassMaterial;
+
+	uint64_t shaderSet; // guid of the shaderset asset that this material uses
+
+	PagePtr_t textureHandles; // ptr to array of texture guids
+	PagePtr_t streamingTextureHandles; // ptr to array of streamable texture guids (empty at build time)
+
+	short numStreamingTextureHandles; // number of textures with streamed mip levels.
+	short width;
+	short height;
+	short depth;
+
+	// array of indices into sampler states array. must be set properly to have accurate texture tiling
+	// used in CShaderGlue::SetupShader (1403B3C60)
+	char samplers[4];// = 0x1D0300;
+
+	uint32_t unk_7C;
+
+	uint32_t unk_80;// = 0x1F5A92BD; // REQUIRED but why?
+
+	uint32_t unk_84;
+
+	uint32_t glueFlags;
+	uint32_t glueFlags2;
+
+	MaterialDXState_t dxStates; // seems to be used for setting up some D3D states?
+
+	int unk_C0[2];
+
+	uint16_t numAnimationFrames; // used in CMaterialGlue::GetNumAnimationFrames (0x1403B4250), which is called from GetSpriteInfo @ 0x1402561FC
+	MaterialShaderType_t materialType;
+	uint8_t uberBufferFlags; // used for unksections loading in UpdateMaterialAsset
+
+	int unk_CC;
+
+	uint64_t textureAnimation;
+
+	int unk_D8[4];
+
+    float unk_E8;
+
+    int unk_EA;
+
+	char unk_F0[16];
+};
+
+struct MaterialAssetHeader_v23_1_t
+{
+	uint64_t unk_0; // same as previous version (as of v23), does not seem to be vtftableReserved (contains data)
+
+	uint64_t snapshotMaterial; // msnp guid
+
+	uint64_t guid; // guid of this material asset
+
+	PagePtr_t name; // pointer to partial asset path
+	PagePtr_t surfaceProp; // pointer to surfaceprop (as defined in surfaceproperties.rson)
+	PagePtr_t surfaceProp2; // pointer to surfaceprop2 
+
+	uint64_t depthShadowMaterial;
+	uint64_t depthPrepassMaterial;
+	uint64_t depthVSMMaterial;
+	uint64_t depthShadowTightMaterial;
+	uint64_t colpassMaterial;
+
+	uint64_t shaderSet; // guid of the shaderset asset that this material uses
+
+	PagePtr_t textureHandles; // ptr to array of texture guids
+	PagePtr_t streamingTextureHandles; // ptr to array of streamable texture guids (empty at build time)
+
+	short numStreamingTextureHandles; // number of textures with streamed mip levels.
+	short width;
+	short height;
+	short depth;
+
+	// array of indices into sampler states array. must be set properly to have accurate texture tiling
+	// used in CShaderGlue::SetupShader (1403B3C60)
+	char samplers[4];// = 0x1D0300;
+
+	uint32_t unk_7C;
+
+	uint32_t unk_80;// = 0x1F5A92BD; // REQUIRED but why?
+
+
+	uint32_t glueFlags;
+	uint32_t glueFlags2;
+
+	char unk_8C[16];
+
+	uint16_t numAnimationFrames; // used in CMaterialGlue::GetNumAnimationFrames (0x1403B4250), which is called from GetSpriteInfo @ 0x1402561FC
+	MaterialShaderType_t materialType;
+	uint8_t uberBufferFlags; // used for unksections loading in UpdateMaterialAsset
+
+	int unk_A0; // unk_CC?
+
+    float unk_A4; // unk_E8?
+
+	uint64_t textureAnimation;
+
+	char unk_B0[8]; // unk_F0 ?
+
+    PagePtr_t cpuDataPtr;
+};
+
+void HandleMaterial(PakAsset_t& asset, uint64_t pageoffsets[])
+{
+    PageSeek(asset.headPagePtr);
+    switch (asset.version)
+    {
+    case 12:
+    {    
+        MaterialAssetHeader_v12_t hdr;
+        break;
+    }
+    case 15:
+    {    
+        MaterialAssetHeader_v15_t hdr;
+        break;
+    }
+    case 16:
+    case 17:
+    case 18:
+    case 19:
+    case 20:
+    case 21:
+    {    
+        MaterialAssetHeader_v16_t hdr;
+        break;
+    }
+    case 22:
+    case 23:
+    {    
+        if (asset.headerStructSize == 192)
+        {
+            MaterialAssetHeader_v23_1_t hdr;
+            break;
+        }
+
+        MaterialAssetHeader_v22_t hdr;
+        break;
+    }
+    };
+
+    PageSeek(hdr.name);
+    string name;
+
+    PageSeek(hdr.surfaceProp);
+    string surfaceProp;
+
+    if (PtrIsValid(hdr.surfaceProp2))
+    {
+        PageSeek(hdr.surfaceProp2);
+        string surfaceProp2;
+    } 
+
+    local const int textureSlotCount = (PageTell(hdr.streamingTextureHandles) - PageTell(hdr.textureHandles)) / sizeof(uint64_t);
+    
+    if (textureSlotCount)
+    {
+        PageSeek(hdr.textureHandles);
+        uint64_t textureHandles[textureSlotCount];
+    
+        PageSeek(hdr.streamingTextureHandles);
+        uint64_t streamingTextureHandles[textureSlotCount];
+    }
+
+    // only one of these should be valid
+    if (PtrIsValid(asset.dataPagePtr))
+    {
+        PageSeek(asset.dataPagePtr);
+        MaterialAssetCPU_t cpu;
+    }
+
+    if (exists(hdr.cpuDataPtr) && PtrIsValid(hdr.cpuDataPtr))
+    {
+        PageSeek(hdr.cpuDataPtr);
+        MaterialAssetCPU_t cpu;
+    }
+
+    if (exists(cpu) && PtrIsValid(cpu.data))
+    {
+        PageSeek(cpu.data);
+        char uberData[cpu.dataSize];
+    }
+}

@@ -1,0 +1,241 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: pakfile_core.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Pak Files
+//  Category: Storage
+// File Mask: *.rpak
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+local int64_t i = 0;
+
+// pak header
+PakHdr_t pakhdr <fgcolor = 0x00ffcc>;
+
+// starpak paths
+if (exists(pakhdr.streamingFilesBufSize))
+    char streamFilePaths[pakhdr.streamingFilesBufSize] <fgcolor = 0x22ff77>;
+
+if (exists(pakhdr.optStreamingFilesBufSize))
+    char optStreamFilePaths[pakhdr.optStreamingFilesBufSize] <fgcolor = 0x77ff77>;
+
+// patch data ?
+
+// non paged data
+PakSegmentHdr_t segments[pakhdr.numSegments] <fgcolor = cLtYellow>;
+PakPageHdr_t pages[pakhdr.numPages] <fgcolor = cLtGreen, read = Str("sz %08x | seg (f: 0x%02x align: 0x%02x) | 0x%02x", this.size, segments[this.segment].flags, segments[this.segment].align, this.align), comment = ReadSegmentFlags(segments[this.segment].flags)>;
+PakPointerHdr_t pointers[pakhdr.numPointers] <fgcolor = cLtGray, read = Str("{page: %i ofs: %i}", this.index, this.offset)>;
+PakAsset_t assets[pakhdr.numAssets] <fgcolor = cBlack, read = Str("%s - %LX", this.type.text, this.guid), comment=Str("v%i sz: %i", this.version, this.headerStructSize)>;
+
+// asset guids within this pak, assets index into this
+if(pakhdr.numGuidRefs)
+{
+    struct
+    {
+        for(i = 0; i < pakhdr.numAssets; i++)
+        {
+            if(!assets[i].dependenciesCount)
+                continue;
+
+            struct
+            {
+                local int asset = i;
+                PakGuidRefHdr_t guidRef[assets[i].dependenciesCount];
+            } guidRefByAsset <read = Str("%s - %LX", assets[this.asset].type.text, assets[this.asset].guid)>;
+        }
+    } guidRefs <fgcolor = cLtYellow>;
+}
+
+// which assets use this asset per asset
+if(pakhdr.numDependencies)
+{
+    struct
+    {
+        for(i = 0; i < pakhdr.numAssets; i++)
+        {
+            if(!assets[i].dependentsCount)
+                continue;
+            
+            struct
+            {
+                local int asset = i;
+                int dependent[assets[i].dependentsCount] <read = Str("%s - %LX", assets[this].type.text, assets[this].guid), comment = Str("Asset Entry Index: %i", this)>;
+            } dependentsByAsset <read = Str("%s - %LX", assets[this.asset].type.text, assets[this.asset].guid)>;
+        }
+    } dependents <fgcolor = cPurple>;
+}
+
+if(pakhdr.numExternalAssetRefs)
+{
+    int externalAssetOffset[pakhdr.numExternalAssetRefs] <bgcolor = cLtGreen, read = ReadString(startof(referencedAssetOffset[0]) + (pakhdr.ExternalAssetCount * 4) + this)>;
+    char externalAssetBuffer[pakhdr.externalAssetRefsSize] <fgcolor=cLtGreen>;
+}
+
+if(exists(pakhdr.unkDataSize_74) && pakhdr.unkDataSize_74 > 0)
+    char data_unk74[pakhdr.unkDataSize_74];
+
+if(exists(pakhdr.unkDataSize_78) && pakhdr.unkDataSize_78 > 0)
+    char data_unk78[pakhdr.unkDataSize_78];
+
+// some functions and vars for data processing
+local uint64_t pageoffsets[pakhdr.numPages]; // store the offset for each page
+
+uint64_t PageTell(const PagePtr_t& ptr)
+{
+    return pageoffsets[ptr.index] + ptr.offset;
+}
+
+void PageSeek(const PagePtr_t& ptr)
+{
+    FSeek(PageTell(ptr));
+}
+
+string PageString(const PagePtr_t& ptr)
+{
+    if (!PtrIsValid(ptr))
+        return "";
+
+    return ReadString(PageTell(ptr));
+}
+
+string DefaultAssetName(const PakAsset_t& asset)
+{
+    return Str("%s - 0x%LX", asset.type.text, asset.guid);
+}
+
+string GetAssetName(const PakAsset_t& asset, const PagePtr_t& ptr)
+{
+    if (!PtrIsValid(ptr))
+        return DefaultAssetName(asset);
+
+    return ReadString(PageTell(ptr));
+}
+
+// paged data
+struct {
+    for (i = 0; i < pakhdr.numPages; i++)
+    {
+        pageoffsets[i] = FTell();
+
+        struct
+        {
+            local int idx = i;
+            char data[pages[i].size];
+        } page <read = ReadSegmentFlags(segments[pages[this.idx].segment].flags), comment = Str("%i", this.idx)>;
+    }
+} page_data;
+
+// color guid refs now that page offsets are set
+FSeek(startof(guidRefs));
+PakGuidRefHdr_t internalGuidRefs[pakhdr.numGuidRefs] <hidden = true>;
+for(i = 0; i < pakhdr.numGuidRefs; i++)
+{
+    PageSeek(internalGuidRefs[i]);
+    uint64_t guid <hidden = true, fgcolor = cYellow>;
+}
+/*if (pakhdr.numGuidRefs)
+{
+    FSeek(startof(guidRefs));
+    PakGuidRefHdr_t internalGuidRefs[pakhdr.numGuidRefs] <hidden = true>;
+
+    local int remainder = pakhdr.numGuidRefs;
+    while (remainder >= 8)
+    {
+        i = pakhdr.numGuidRefs - remainder;
+
+        PageSeek(internalGuidRefs[i]);
+        uint64_t guid <hidden=true, fgcolor=cYellow>;
+        PageSeek(internalGuidRefs[i + 1]);
+        uint64_t guid <hidden=true, fgcolor=cYellow>;
+        PageSeek(internalGuidRefs[i + 2]);
+        uint64_t guid <hidden=true, fgcolor=cYellow>;
+        PageSeek(internalGuidRefs[i + 3]);
+        uint64_t guid <hidden=true, fgcolor=cYellow>;
+        PageSeek(internalGuidRefs[i + 4]);
+        uint64_t guid <hidden=true, fgcolor=cYellow>;
+        PageSeek(internalGuidRefs[i + 5]);
+        uint64_t guid <hidden=true, fgcolor=cYellow>;
+        PageSeek(internalGuidRefs[i + 6]);
+        uint64_t guid <hidden=true, fgcolor=cYellow>;
+        PageSeek(internalGuidRefs[i + 7]);
+        uint64_t guid <hidden=true, fgcolor=cYellow>;
+
+        remainder -= 8;
+
+        Printf("rem %i\n", remainder);
+    }
+
+    for (i = pakhdr.numGuidRefs - remainder; i < pakhdr.numGuidRefs; i++)
+    {
+        PageSeek(internalGuidRefs[i]);
+        uint64_t guid <hidden=true, fgcolor=cYellow>;
+    }
+}*/
+
+// asset data
+#include "./pakfile_txtr.bt"
+#include "./pakfile_matl.bt"
+#include "./pakfile_msnp.bt"
+#include "./pakfile_mdl_.bt"
+
+FSeek(startof(page_data));
+struct
+{
+    for(i = 0; i < pakhdr.numAssets; i++)
+    {
+        FSeek(startof(page_data));
+        switch(assets[i].type.value)
+        {
+        case ID_TXTR:
+        {
+            struct {
+                local int index = i;
+                HandleTexture(assets[index], pageoffsets);
+            } asset_txtr <read = GetAssetName(assets[index], this.hdr.name)>;
+
+            break;
+        }
+        case ID_MATL:
+        {
+            struct {
+                local int index = i;
+                HandleMaterial(assets[index], pageoffsets);
+            } asset_matl <read = GetAssetName(assets[index], this.hdr.name)>;
+
+            break;
+        }
+        case ID_MSNP:
+        {
+            struct {
+                local int index = i;
+                HandleMaterialSnapshot(assets[index], pageoffsets);
+            } asset_msnp <read = DefaultAssetName(assets[index])>;
+
+            break;
+        }
+        case ID_MDL_:
+        {
+            struct {
+                local int index = i;
+                HandleModel(assets[index], pageoffsets);
+            } asset_mdl <read=GetAssetName(assets[index], this.hdr.name)>;
+
+            break;
+        }
+        default:
+        {
+            struct {
+                local int index = i;
+                PageSeek(assets[index].headPagePtr);
+                char data[assets[index].headerStructSize];
+            } asset_stub <read = DefaultAssetName(assets[index])>;
+
+            break;
+        }
+        }
+    }
+} asset_data;

@@ -1,0 +1,98 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: pakfile_mdl_.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Pak Files
+//  Category: Storage
+// File Mask: *.rpak
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+const uint32_t ID_MDL_ = 0x5F6C646D;
+
+struct ModelAssetCPU_t
+{
+	PagePtr_t physics;
+	int dataSizePhys;
+	int dataSizeModel;
+};
+
+struct ModelAssetHeader_v16_t
+{
+	PagePtr_t data; // ptr to studiohdr & rmdl buffer
+	PagePtr_t name;
+	char gap_10[8];
+
+	PagePtr_t permVertData; // used for static prop cache
+
+	PagePtr_t animRigs;
+	int numAnimRigs;
+
+	int streamingDataSize; // size of VG data post-baking
+
+	float bbox_min[3];
+	float bbox_max[3];
+
+	short gap_48;
+
+	short numAnimSeqs;
+
+	char gap_4C[4];
+
+	PagePtr_t animSeqs;
+
+	char gap_58[8];
+};
+
+void HandleModel(PakAsset_t& asset, uint64_t pageoffsets[])
+{
+    PageSeek(asset.headPagePtr);
+    switch (asset.version)
+    {
+    case 16:
+    case 17:
+    case 18:
+    {
+        ModelAssetHeader_v16_t hdr;
+        break;
+    }
+    };
+
+    if (PtrIsValid(asset.dataPagePtr))
+    {
+        PageSeek(asset.dataPagePtr);
+        ModelAssetCPU_t cpu;
+    }
+
+    local int studioDataSize = 4;
+    if (asset.version < 16)
+    {
+        // read length var here
+    }
+
+    if (exists(cpu))
+    {
+        studioDataSize = cpu.dataSizeModel;
+    }
+
+    PageSeek(hdr.data);
+    char studioData[studioDataSize];
+
+    PageSeek(hdr.name);
+    string name;
+
+    if (hdr.numAnimRigs)
+    {
+        PageSeek(hdr.animRigs);
+        uint64_t animRigs[hdr.numAnimRigs];
+    }
+
+    if (hdr.numAnimSeqs)
+    {
+        PageSeek(hdr.animSeqs);
+        uint64_t animSeqs[hdr.numAnimSeqs];
+    }
+}

@@ -1,0 +1,136 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: pakfile_txtr.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Pak Files
+//  Category: Storage
+// File Mask: *.rpak
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+const uint32_t ID_TXTR = 0x72747874;
+
+struct TextureAssetHeader_v8_t
+{
+    uint64_t guid;
+    PagePtr_t name <read = PageString(this)>;
+
+    uint16_t width;
+    uint16_t height;
+    uint16_t depth;
+
+    uint16_t imgFormat;
+    uint32_t dataSize;
+
+    uint8_t unk_1C;
+    uint8_t optStreamedMipLevels;
+    uint8_t arraySize; // createtexture2d desc param
+
+    uint8_t layerCount;
+    uint8_t usageFlags; // ?
+    uint8_t permanentMipLevels;
+    uint8_t streamedMipLevels;
+
+    uint8_t unk_23[13];
+    __int64 numPixels; // reserved
+};
+
+struct TextureAssetHeader_v9_t
+{
+    PagePtr_t name <read = PageString(this)>;
+
+    uint16_t imgFormat;
+    uint16_t width;
+    uint16_t height;
+    uint16_t depth;
+
+    uint8_t arraySize;
+
+    uint8_t layerCount;
+
+    uint8_t unk_12; // unk0
+    uint8_t usageFlags; // "mipFlags"
+
+    uint32_t dataSize;
+    uint8_t permanentMipLevels;
+    uint8_t streamedMipLevels;
+    uint8_t optStreamedMipLevels;
+
+    uint8_t type;
+
+    uint16_t compTypePacked;
+    uint16_t compressedBytes[7];
+
+    uint16_t unk_2C[2];
+    uint8_t unk_30[8]; // filled per streamed mip
+};
+
+struct TextureAssetHeader_v10_t
+{
+    PagePtr_t name <read = PageString(this)>;
+
+    uint16_t imgFormat;
+    uint16_t width;
+    uint16_t height;
+    uint16_t depth;
+
+    uint8_t arraySize;
+
+    uint8_t layerCount;
+
+    uint8_t unk_12;
+
+    // This is still usage flags, but it now indexes into an array
+    // (see dword_14128A858 in 180_J25_CL4941853_2023_07_27_16_31)
+    // to get the D3D11_USAGE flags. However, it is still the same
+    // as earlier versions, earlier versions however only nulled
+    // the usage flags if this field was 2.
+    uint8_t usageFlags;
+
+    uint32_t dataSize;
+    uint8_t permanentMipLevels;
+    uint8_t streamedMipLevels;
+    uint8_t optStreamedMipLevels;
+    uint8_t unk_1B; // related to mips, used oddly
+    uint8_t unkMipLevels; // new type of streamed mip, gets added on to opt stream & streamed mip count. V9 does not have this.
+
+    uint8_t type;
+
+    // this is packed eCompressionType (2 bits per enum), not all streamed mips are compressed.
+    // (compTypePacked >> (2 * mipIndex)) & 3
+    uint16_t compTypePacked;
+    uint16_t compressedBytes[7];
+
+    uint16_t unk_2E; // unk_2C but uint8_t probably
+    uint8_t unk_30[8]; // filled per streamed mip
+};
+
+void HandleTexture(PakAsset_t& asset, uint64_t pageoffsets[])
+{
+    PageSeek(asset.headPagePtr);
+    switch (asset.version)
+    {
+    case 8:
+    {
+        TextureAssetHeader_v8_t hdr;
+        break;
+    }
+    case 9:
+    {
+        TextureAssetHeader_v9_t hdr;
+        break;
+    }
+    case 10:
+    {
+        TextureAssetHeader_v10_t hdr;
+        break;
+    }
+    };
+
+    // all textures should have cpu data
+    PageSeek(asset.dataPagePtr);
+    char cpu;
+}

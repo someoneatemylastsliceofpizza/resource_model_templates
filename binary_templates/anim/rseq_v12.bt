@@ -73,15 +73,15 @@ struct mstudioseqdesc_t
 	uint16_t activitymodifierindex;
 	uint16_t numactivitymodifiers;
 
-	int ikResetMask; // new in v52
+	int ikResetMask;
 	int unk1;
 
 	uint16_t weightFixupOffset;
 	uint16_t weightFixupCount;
 
-    // points to an array of ints
-    uint16_t unk_70; // offset
-    uint16_t unk_72; // count
+    // disables interp for certain frames (from what I can tell)
+    uint16_t noInterpFrameOffset;
+    uint16_t noInterpFrameCount;
 };
 
 struct mstudioevent_t
@@ -137,6 +137,12 @@ struct mstudioseqweightfixup_t
     float unk_C;
     float unk_10;
     float unk_14;
+};
+
+struct mstudio_nointerpframes_t
+{
+    int firstFrame;
+    int lastFrame;
 };
 
 // 'index' member removed, as it was unused anywhere.
@@ -225,8 +231,14 @@ const bool useBigNumbers = false;
 
 #include "./rseq.bt"
 
-if (seqdesc.unk_72)
+if (seqdesc.noInterpFrameCount)
 {
-    FSeek(startof(seqdesc) + GetRMDLOffset(seqdesc.unk_70));
-    int unkData_12[seqdesc.unk_72] <fgcolor=0x60e060>;
+    local const int dataSize = GetRMDLOffset(seqdesc.szlabelindex) - GetRMDLOffset(seqdesc.noInterpFrameOffset);
+    local const bool usePairs = seqdesc.noInterpFrameCount * sizeof(mstudio_nointerpframes_t) == dataSize;
+
+    FSeek(startof(seqdesc) + GetRMDLOffset(seqdesc.noInterpFrameOffset));
+    if (usePairs)
+        mstudio_nointerpframes_t nointerpframes[seqdesc.noInterpFrameCount]  <fgcolor=0x60e060>;
+    else
+        int nointerpframes[seqdesc.noInterpFrameCount] <fgcolor=0x60e060>;
 }

@@ -1,0 +1,36 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: pakfile_matl.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Pak Files
+//  Category: Storage
+// File Mask: *.rpak
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+const uint32_t ID_MSNP = 0x706E736D;
+
+struct  MaterialSnapshotAssetHeader_v1_t
+{
+	MaterialDXState_t dxStates;
+
+    uint64_t shaderset; // guid for shaderset
+
+    uint64_t unk_38;
+};
+
+void HandleMaterialSnapshot(PakAsset_t& asset, uint64_t pageoffsets[])
+{
+    PageSeek(asset.headPagePtr);
+    switch (asset.version)
+    {
+    case 1:
+    {    
+        MaterialSnapshotAssetHeader_v1_t hdr;
+        break;
+    }
+    }
+}

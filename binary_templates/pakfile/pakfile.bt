@@ -1,0 +1,149 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: pakfile.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Pak Files
+//  Category: Storage
+// File Mask: *.rpak
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+struct PakPatchFileHdr_t
+{
+    __int64 cmpSize;
+    __int64 dcmpSize;
+};
+
+struct PakPatchDataHdr_t
+{
+    int patchDataStreamSize;
+    int patchPageCount;
+};
+
+// represents a pointer to data in an RPak data page
+// in file, this is index/offset
+// when loaded, this is converted to an actual pointer to be used by the engine
+struct PagePtr_t
+{
+    int index;
+    int offset;
+};
+
+// not reliable
+bool PtrIsValid(const PagePtr_t& ptr)
+{
+    if (!ptr.index && !ptr.offset)
+        return false;
+
+    if (ptr.index < 0 || ptr.offset < 0)
+        return false;
+
+    return true;
+}
+
+// header struct for each "virtual segment"
+// flags - segment flags, see above
+// align - byte alignment for pages when loaded into memory
+// size is the total size of all pages that point to this segment
+struct PakSegmentHdr_t
+{
+    int flags;
+    uint32_t align;
+    int64_t size;
+};
+
+// header struct for each page
+// each page header corresponds to a separate section of data
+// segment - index into array of segment headers
+// align - byte alignment for page when loaded into memory?
+// size - size of data in this page
+struct PakPageHdr_t
+{
+    int segment;
+    int align;
+    unsigned int size;
+};
+
+// header is used to locate all pointers before assets are loaded, so that the engine can easily follow the pointer without page lookup
+typedef PagePtr_t PakPointerHdr_t;
+
+// header is used to locate all GUID dependencies (i.e. where an asset uses the GUID of another asset to point to its header)
+// GUIDs are converted to pointers at pak load
+typedef PagePtr_t PakGuidRefHdr_t;
+
+union AssetGuid_t
+{
+    uint64_t guid;
+    uint64_t ptr;
+};
+
+// OLD AND BAD
+string ReadSegmentFlags(uint flags)
+{
+    string value = "";
+
+    if(flags == 0)
+        return "HEAD";
+
+    int i = 0;
+    int flag = 0;
+
+    int flagsFound = 0;
+
+    for(i = 0; i < 32; i++)
+    {
+        flag = flags & (1 << i);
+
+        if(flag != 0)
+        {
+            flagsFound++;
+        }
+    }
+
+    if((flags & 1) != 1)
+        value += "HEAD | ";
+
+    int flagCounter = 0;
+    for(i = 0; i < 32; i++)
+    {
+        flag = flags & (1 << i);
+
+        switch(flag)
+        {
+        case 0:
+            break;
+        case 0x1:
+            value += "SF_CPU";
+            break;
+        case 0x2:
+            value += "SF_TEMP";
+            break;
+        case 0x20:
+            value += "SF_SERVER";
+            break;
+        case 0x40:
+            value += "SF_CLIENT";
+            break;
+        case 0x80:
+            value += "SF_DEV";
+            break;
+        default:
+            value += Str("UNK_%x", flag);
+            break;
+        }
+
+        if(flag != 0)
+        {
+            flagCounter++;
+            if(flagCounter < flagsFound)
+            {
+                value += " | ";
+            }
+        }
+    }
+
+    return value;
+}

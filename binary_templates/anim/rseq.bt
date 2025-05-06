@@ -11,6 +11,8 @@
 //   History: 
 //------------------------------------------------
 
+local bool canParseAnim = true;
+
 #define ANIM_VALID 0x20000
 
 #define STUDIO_ANIM_POS 0x1 // bone has pos values
@@ -74,6 +76,12 @@ mstudioseqdesc_t seqdesc <fgcolor=0xf0b27a, read=Str("%s", ReadString(startof(th
 // hacky but there really is no better way to get this without the rrig or rmdl
 local int boneCount = (GetRMDLOffset(seqdesc.activitymodifierindex) - GetRMDLOffset(seqdesc.weightlistindex)) / 4;
 local int animCount = (seqdesc.groupsize[0] * seqdesc.groupsize[1]);
+
+if (seqdesc.weightlistindex == 1 || seqdesc.weightlistindex == 3)
+{
+    boneCount = 0;
+    canParseAnim = false;
+}
 
 // pose keys
 if(seqdesc.posekeyindex)
@@ -443,7 +451,7 @@ void ParseAnimdesc(const uint64_t baseptr, const uint16_t animindex)
         if (!(animdesc.flags & ANIM_VALID))
             return;
 
-        if (animdesc.sectionframes > 0)
+        if (animdesc.sectionframes > 0 && canParseAnim)
         {
             // this equation gets the max INDEX of the array, if we add one to this, we'll get the section count
             local const int sectionCount = useStallFrameCount ?
@@ -475,13 +483,14 @@ void ParseAnimdesc(const uint64_t baseptr, const uint16_t animindex)
                 rle_anim section(startof(animdesc), sections[j].animindex, boneCount, maxFrames);
             };
         }
-        else
+
+        if (animdesc.sectionframes == 0 && canParseAnim)
         {
             FSeek(startof(animdesc) + animdesc.animindex);
             rle_anim animation(startof(animdesc), animdesc.animindex, boneCount, animdesc.numframes - 1);
         }
 
-        if(animdesc.numikrules)
+        if(animdesc.numikrules && !(animdesc.ikruleindex == 3 || animdesc.ikruleindex == 5))
         {
             for(j = 0; j < animdesc.numikrules; j++)
             {

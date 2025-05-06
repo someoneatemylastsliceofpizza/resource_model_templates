@@ -1,0 +1,108 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: pakfile_v8.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Pak Files
+//  Category: Storage
+// File Mask: *.rpak
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+#include "../source_math.bt"
+#include "./pakfile.bt"
+
+struct PakAsset_t
+{
+    uint64_t guid;
+    char unk0[8];
+
+    // page with SF_HEAD flag
+    PagePtr_t headPagePtr;
+
+    // technically "cpu" but this is confusing so just "data". SF_CPU
+    PagePtr_t dataPagePtr;
+
+    __int64 starpakOffset;
+    __int64 optStarpakOffset;
+
+    uint16_t pageEnd;
+
+    // value is decremented every time a dependency finishes processing its own dependencies
+    uint16_t remainingDependencyCount;
+
+    // really not sure why this is a thing
+    // index into array of asset indexes - indicates which LOCAL assets are dependent on this asset (reference by GUID)
+    uint32_t dependentsIndex;
+
+    // index into array of ptrs - items point to the page locations at which this asset has a GUID reference (to be converted to a pointer at load)
+    uint32_t dependenciesIndex;
+
+    int dependentsCount;
+
+    uint16_t dependenciesCount;
+    uint16_t unk2; // might be padding in s3. sometimes used as a separate var in later versions
+
+    uint32_t headerStructSize;
+
+    uint8_t version;
+
+    uint8_t unk3[3];
+
+    // 4-char abbreviation of asset type
+    union {
+        uint32_t value;
+        char text[4];
+    } type;
+};
+
+struct PakHdr_t
+{
+    int magic;
+    short version;
+    short flags;
+    uint64_t createdTime;
+    uint64_t crc;
+
+    __int64 cmpSize; // compressed data size
+
+    char gap_20[16];
+
+    __int64 dcmpSize; // decompressed file size. will be the same as cmpSize if compressed flag is not set
+    char gap_38[16];
+
+    short streamingFilesBufSize;
+    short optStreamingFilesBufSize;
+
+    // not sure if these are actually unsigned?
+    uint16_t numSegments;
+    uint16_t numPages;
+
+    // (01).rpak - 1: base
+    // (02).rpak - 2: base, (01)
+    // (03).rpak - 3: base, (01), (02)
+    short patchCount; // actually might be the number of pak files "under" this one
+
+    char pad[2];
+
+    int numPointers;
+    int numAssets;
+    int numGuidRefs;
+    int numDependencies;
+
+    // unused in r5
+    int numExternalAssetRefs;
+    int externalAssetRefsSize;
+
+    char gap_6C[8];
+
+    //int unkCount; // unknown, unused in n1094
+    uint32_t unkDataSize_74;
+    uint32_t unkDataSize_78;
+
+    char gap_7C[4];
+};
+
+#include "./pakfile_core.bt"
