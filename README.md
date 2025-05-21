@@ -10,23 +10,19 @@ Studio Model:
   - vertex (vvd, vvc, and vvw)
 
 Misc:
-  - pakfile (wip)
+  - pakfile
 
 # Templates (legacy)
 Located in the 'structs' folder.
 
 Studio Model:
-  -V47 (with original Xbox structs as well)  
-  -V48  
-  -V49 (Portal 2 and Alien Swarm branches)
-  -V52  
-  -V53  
-  -V54 (subversions: 8/9/10/11/12/12.1/12.2/13/14/15/16)
+  - V47 (with original Xbox structs as well)  
+  - V48  
+  - V49 (Portal 2 and Alien Swarm branches)
+  - V52  
+  - V53  
+  - V54 (subversions: 8/9/10/11/12/12.1/12.2/13/14/15/16)
 
 External Files:
-  -VPHY	
-  -RPHY (incomplete)	
-  -VTX subversions: 7	
-  -VVD	
-  -VVC	 
-  -VG (soon) 
+  - VTX subversions: 7	
+  - VG (soon) 
