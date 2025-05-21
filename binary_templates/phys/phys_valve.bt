@@ -162,8 +162,6 @@ void CreateIVPSNode(int pSurfaceStart, int pNode)
 
 phyheader_t header <bgcolor=cLtRed>;
 
-local int i = 0;
-
 for (i = 0; i < header.solidCount; i++)
 {
     struct {

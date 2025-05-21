@@ -11,6 +11,9 @@
 //   History: 
 //------------------------------------------------
 
+#ifndef SOURCEMATH_H
+#define SOURCEMATH_H
+
 typedef ubyte uint8;
 typedef char int8_t;
 typedef unsigned char uint8_t;
@@ -145,3 +148,8 @@ struct VertexColor_t
 {
 	uint8 r, g, b, a;
 };
+
+// silly guy
+local int64_t i = 0;
+
+#endif

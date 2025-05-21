@@ -5,31 +5,57 @@
 //   Authors: Rika
 //   Version: 0.1
 //   Purpose: Respawn Pak Files
-//  Category: Storage
+//  Category: Archive
 // File Mask: *.rpak
-//  ID Bytes: 
+//  ID Bytes: 52 50 61 6b
 //   History: 
 //------------------------------------------------
 
-local int64_t i = 0;
-
 // pak header
-PakHdr_t pakhdr <fgcolor = 0x00ffcc>;
+PakHdr_t pakhdr <fgcolor=0xffffaa>;
+
+const local uint64_t fileSize = FileSize();
+
+// v6 pak is uncompressed
+if (pakhdr.version > 6)
+{
+    if (pakhdr.flags & 0x100 && fileSize != pakhdr.dcmpSize)
+    {
+        Printf("Pak was compressed with respawn compression");
+        return;
+    }
+    
+    if (pakhdr.flags & 0x200 && fileSize != (pakhdr.dcmpSize + sizeof(PakHdr_t)))
+    {
+        Printf("Pak was compressed with oodle compression");
+        return;
+    }
+}
+
+// patches
+if (exists(pakhdr.patchCount) && pakhdr.patchCount > 0)
+{
+    
+    PakPatchDataHdr_t patchDataHeader;
+    PakPatchFileHdr_t patchFileHeaders[pakhdr.patchCount];
+
+    uint16_t patchIndices[pakhdr.patchCount];
+}
 
 // starpak paths
 if (exists(pakhdr.streamingFilesBufSize))
-    char streamFilePaths[pakhdr.streamingFilesBufSize] <fgcolor = 0x22ff77>;
+    char streamFilePaths[pakhdr.streamingFilesBufSize] <fgcolor=0x22ff77>;
 
 if (exists(pakhdr.optStreamingFilesBufSize))
-    char optStreamFilePaths[pakhdr.optStreamingFilesBufSize] <fgcolor = 0x77ff77>;
+    char optStreamFilePaths[pakhdr.optStreamingFilesBufSize] <fgcolor=0xaaff77>;
 
 // patch data ?
 
 // non paged data
-PakSegmentHdr_t segments[pakhdr.numSegments] <fgcolor = cLtYellow>;
-PakPageHdr_t pages[pakhdr.numPages] <fgcolor = cLtGreen, read = Str("sz %08x | seg (f: 0x%02x align: 0x%02x) | 0x%02x", this.size, segments[this.segment].flags, segments[this.segment].align, this.align), comment = ReadSegmentFlags(segments[this.segment].flags)>;
-PakPointerHdr_t pointers[pakhdr.numPointers] <fgcolor = cLtGray, read = Str("{page: %i ofs: %i}", this.index, this.offset)>;
-PakAsset_t assets[pakhdr.numAssets] <fgcolor = cBlack, read = Str("%s - %LX", this.type.text, this.guid), comment=Str("v%i sz: %i", this.version, this.headerStructSize)>;
+PakSegmentHdr_t segments[pakhdr.numSegments] <fgcolor=0xccffcc>;
+PakPageHdr_t pages[pakhdr.numPages] <fgcolor=0xffccaa, read=Str("sz %08x | seg (f: 0x%02x align: 0x%02x) | 0x%02x", this.size, segments[this.segment].flags, segments[this.segment].align, this.align), comment = ReadSegmentFlags(segments[this.segment].flags)>;
+PakPointerHdr_t pointers[pakhdr.numPointers] <fgcolor=0xffaacc, read=Str("{page: %i ofs: %i}", this.index, this.offset)>;
+PakAsset_t assets[pakhdr.numAssets] <fgcolor=0xbbaaaa, read=Str("%s - %LX", this.type.text, this.guid), comment=Str("v%i sz: %i", this.version, this.headerStructSize)>;
 
 // asset guids within this pak, assets index into this
 if(pakhdr.numGuidRefs)
@@ -47,7 +73,7 @@ if(pakhdr.numGuidRefs)
                 PakGuidRefHdr_t guidRef[assets[i].dependenciesCount];
             } guidRefByAsset <read = Str("%s - %LX", assets[this.asset].type.text, assets[this.asset].guid)>;
         }
-    } guidRefs <fgcolor = cLtYellow>;
+    } guidRefs <fgcolor=0xddaaff>;
 }
 
 // which assets use this asset per asset
@@ -66,7 +92,7 @@ if(pakhdr.numDependencies)
                 int dependent[assets[i].dependentsCount] <read = Str("%s - %LX", assets[this].type.text, assets[this].guid), comment = Str("Asset Entry Index: %i", this)>;
             } dependentsByAsset <read = Str("%s - %LX", assets[this.asset].type.text, assets[this.asset].guid)>;
         }
-    } dependents <fgcolor = cPurple>;
+    } dependents <fgcolor=0xff66ff>;
 }
 
 if(pakhdr.numExternalAssetRefs)
@@ -80,6 +106,11 @@ if(exists(pakhdr.unkDataSize_74) && pakhdr.unkDataSize_74 > 0)
 
 if(exists(pakhdr.unkDataSize_78) && pakhdr.unkDataSize_78 > 0)
     char data_unk78[pakhdr.unkDataSize_78];
+
+if (exists(pakhdr.patchCount) && pakhdr.patchCount > 0)
+{
+    char patchData[patchDataHeader.patchDataStreamSize];
+}
 
 // some functions and vars for data processing
 local uint64_t pageoffsets[pakhdr.numPages]; // store the offset for each page
@@ -115,6 +146,25 @@ string GetAssetName(const PakAsset_t& asset, const PagePtr_t& ptr)
     return ReadString(PageTell(ptr));
 }
 
+string GetAssetNameFull(const PakAsset_t& asset, const PagePtr_t& ptr, const string prefix, const string suffix)
+{
+    if (!PtrIsValid(ptr))
+        return DefaultAssetName(asset);
+
+    string name = ReadString(PageTell(ptr));
+
+    const int prefixLength = Strlen(prefix);
+    if (Strncmp(name, prefix, prefixLength))
+        name = Str("%s\\%s", prefix, name);
+
+    const int suffixLength = Strlen(suffix);
+    const int suffixOffset = Strlen(name) - suffixLength;
+    if (Strncmp(SubStr(name, suffixOffset, suffixLength), suffix, suffixLength))
+        name = Str("%s%s", name, suffix);
+
+    return name;
+}
+
 // paged data
 struct {
     for (i = 0; i < pakhdr.numPages; i++)
@@ -129,58 +179,13 @@ struct {
     }
 } page_data;
 
-// color guid refs now that page offsets are set
-FSeek(startof(guidRefs));
-PakGuidRefHdr_t internalGuidRefs[pakhdr.numGuidRefs] <hidden = true>;
-for(i = 0; i < pakhdr.numGuidRefs; i++)
-{
-    PageSeek(internalGuidRefs[i]);
-    uint64_t guid <hidden = true, fgcolor = cYellow>;
-}
-/*if (pakhdr.numGuidRefs)
-{
-    FSeek(startof(guidRefs));
-    PakGuidRefHdr_t internalGuidRefs[pakhdr.numGuidRefs] <hidden = true>;
-
-    local int remainder = pakhdr.numGuidRefs;
-    while (remainder >= 8)
-    {
-        i = pakhdr.numGuidRefs - remainder;
-
-        PageSeek(internalGuidRefs[i]);
-        uint64_t guid <hidden=true, fgcolor=cYellow>;
-        PageSeek(internalGuidRefs[i + 1]);
-        uint64_t guid <hidden=true, fgcolor=cYellow>;
-        PageSeek(internalGuidRefs[i + 2]);
-        uint64_t guid <hidden=true, fgcolor=cYellow>;
-        PageSeek(internalGuidRefs[i + 3]);
-        uint64_t guid <hidden=true, fgcolor=cYellow>;
-        PageSeek(internalGuidRefs[i + 4]);
-        uint64_t guid <hidden=true, fgcolor=cYellow>;
-        PageSeek(internalGuidRefs[i + 5]);
-        uint64_t guid <hidden=true, fgcolor=cYellow>;
-        PageSeek(internalGuidRefs[i + 6]);
-        uint64_t guid <hidden=true, fgcolor=cYellow>;
-        PageSeek(internalGuidRefs[i + 7]);
-        uint64_t guid <hidden=true, fgcolor=cYellow>;
-
-        remainder -= 8;
-
-        Printf("rem %i\n", remainder);
-    }
-
-    for (i = pakhdr.numGuidRefs - remainder; i < pakhdr.numGuidRefs; i++)
-    {
-        PageSeek(internalGuidRefs[i]);
-        uint64_t guid <hidden=true, fgcolor=cYellow>;
-    }
-}*/
-
 // asset data
 #include "./pakfile_txtr.bt"
 #include "./pakfile_matl.bt"
 #include "./pakfile_msnp.bt"
 #include "./pakfile_mdl_.bt"
+#include "./pakfile_rpsk.bt"
+#include "./pakfile_font.bt"
 
 FSeek(startof(page_data));
 struct
@@ -195,7 +200,7 @@ struct
             struct {
                 local int index = i;
                 HandleTexture(assets[index], pageoffsets);
-            } asset_txtr <read = GetAssetName(assets[index], this.hdr.name)>;
+            } asset_txtr <read=GetAssetNameFull(assets[index], this.hdr.name, "texture", ".rpak")>;
 
             break;
         }
@@ -226,6 +231,24 @@ struct
 
             break;
         }
+        case ID_RPSK:
+        {
+            struct {
+                local int index = i;
+                HandleParticleScript(assets[index], pageoffsets);
+            } asset_rpsk <read=GetAssetNameFull(assets[index], this.hdr.name, "particle_script", ".rpak")>;
+
+            break;
+        }
+        case ID_FONT:
+        {
+            struct {
+                local int index = i;
+                HandleUIFontAtlas(assets[index], pageoffsets);
+            } asset_font <read=DefaultAssetName(assets[index])>;
+
+            break;
+        }
         default:
         {
             struct {
@@ -239,3 +262,23 @@ struct
         }
     }
 } asset_data;
+
+// after asset data as it can take a while
+if (pakhdr.numGuidRefs)
+{
+    FSeek(startof(guidRefs));
+    PakGuidRefHdr_t internalGuidRefs[pakhdr.numGuidRefs] <hidden = true>;
+
+    for(i = 0; i < pakhdr.numGuidRefs; i++)
+    {
+        PageSeek(internalGuidRefs[i]);
+        uint64_t guid <hidden = true, fgcolor = cYellow>;
+    }
+}
+
+// color pointers
+for (i = 0; i < pakhdr.numPointers; i++)
+{
+    PageSeek(pointers[i]);
+    PagePtr_t ptr_color <hidden=true, fgcolor=0xCCCC00>;
+}

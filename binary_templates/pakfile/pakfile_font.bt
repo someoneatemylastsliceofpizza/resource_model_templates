@@ -1,0 +1,474 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: pakfile_rpsk.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Pak Files
+//  Category: Archive
+// File Mask: *.rpak
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+const uint32_t ID_FONT = 0x746E6F66;
+
+struct UIFont_UNK_t
+{
+    int unk_0;
+    float unk_4;
+};
+
+// proportions
+struct UIFontProportion_v7_t
+{
+    float scaleBounds; // for the addition size added on to of the base size
+    float scaleSize; // for the basic character size
+};
+
+struct UIFontProportion_v12_t
+{
+    float scaleBounds; // for the addition size added on to of the base size
+    float scaleSize; // for the basic character size
+
+    int unk_8;
+    float unk_C;
+    int unk_10;
+    float unk_14;
+};
+
+// textures
+struct UIFontTexture_v6_t
+{
+    // for kerning?
+    float unk_0;
+    uint16_t unk_4;
+    uint8_t unk_6;
+    uint8_t unk_7;
+
+    // approximate, fixed with other values. maybe this is into a chunk/sector?
+    float posBaseX;
+    float posBaseY;
+
+    // local to posBase, these get scaled by vector2d from the font, likely to preserve some precision
+    float posMinX;
+    float posMinY;
+
+    float posMaxX;
+    float posMaxY;
+};
+
+struct UIFontTexture_v7_t
+{
+    // for kerning?
+    float unk_0;
+    uint16_t unk_4;
+    uint8_t unk_6;
+
+    uint8_t proportionIndex; // index into an array of two floats for different proportioned characters
+
+    // approximate, fixed with other values. maybe this is into a chunk/sector?
+    float posBaseX;
+    float posBaseY;
+
+    // local to posBase, these get scaled by vector2d from the font, likely to preserve some precision
+    float posMinX;
+    float posMinY;
+
+    float posMaxX;
+    float posMaxY;
+};
+
+struct UIFontTexture_v12_t
+{
+    // for kerning?
+    float unk_0;
+    uint16_t unk_4;
+
+    uint16_t unk_6;
+
+    char unk_8;
+
+    char proportionIndex; // index into an array of fixed up Vector2D from FontHeader_t unk_48. max of 29 (only 30 vectors)
+
+    uint8_t unk_A[2];
+
+    // approximate, fixed with other values.
+    float posBaseX;
+    float posBaseY;
+
+    // local to posBase, these get scaled by vector2d from the font, likely to preserve some precision
+    float posMinX;
+    float posMinY;
+
+    float posMaxX;
+    float posMaxY;
+};
+
+// unicode map for v6
+struct UIFontUnicodeMap_t
+{
+    int unicodeFirst; // first valid unicode in this block
+    int unicodeLast;  // last valid unicode in this block
+    int textureIndex; // index into textures
+};
+
+// fonts
+struct UIFontHeader_v6_t
+{
+    PagePtr_t name;
+
+    uint16_t fontIndex;
+
+    uint16_t numUnicodeMaps;
+
+    // perhaps 32 bit
+    uint32_t numTextures; // used for mem alloc
+
+    // for scaling the character proportions
+    // I think?? done very oddly in v6
+    float proportionScaleX;
+    float proportionScaleY;
+
+    float unk_18[2];
+
+    float proportionSizeScale;
+
+    uint16_t numGlyphChunks;
+
+    // base index for texture count
+    uint16_t textureIndex;
+
+    PagePtr_t unicodeMap; // unicodes?
+    PagePtr_t textures; // array of UIFontTexture_v7_t
+
+    PagePtr_t unk_38; // for kerning?
+};
+
+struct UIFontHeader_v7_t
+{
+    PagePtr_t name;
+
+    uint16_t fontIndex;
+
+    uint16_t numProportions; // number of character proportions
+
+    // number of chunks for glyph and unicode lookup, 64 unique glyphs/unicodes per chunk
+    uint16_t numGlyphChunks; // unused
+    uint16_t numUnicodeChunks;
+
+    int glyphIndex; // base glyph index, unused
+    int unicodeIndex; // base unicode character index, this gets subtracted off input characters, everything before this index is invalid.
+
+    uint32_t numTextures; // used for mem alloc
+
+    // for scaling the character proportions
+    float proportionScaleX;
+    float proportionScaleY;
+
+    float unk_24[2];
+
+    // base index for texture count
+    uint32_t textureIndex; // used for mem alloc
+
+    // for getting a texture from a provided unicode/glyph
+    PagePtr_t unicodeChunks; // index per 64 unicodes, index into other arrays to get assigned texture (unicodeBaseIndex & unicodeIndexMask)
+    PagePtr_t unicodeChunksIndex; // the base texture index, added with popcount from unicodeIndexMask
+    PagePtr_t unicodeChunksMask; // each bit represents a single unicode
+
+    PagePtr_t proportions; // array of UIFontProportion_v7_t
+    PagePtr_t textures; // array of UIFontTexture_v7_t
+
+    PagePtr_t unk_58; // for kerning?
+};
+
+struct UIFontHeader_v12_t
+{
+    PagePtr_t name;
+
+    uint16_t fontIndex;
+
+    uint16_t numProportions; // number of character proportions
+
+    // number of chunks for glyph and unicode lookup, 64 unique glyphs/unicodes per chunk
+    uint16_t numGlyphChunks;
+    uint16_t numUnicodeChunks;
+
+    int glyphIndex; // base glyph index
+    int unicodeIndex; // base unicode character index, this gets subtracted off input characters, everything before this index is invalid.
+
+    uint32_t numGlyphTextures; // used for mem alloc TODO: is this just number of glyphs
+    uint32_t numUnicodeTextures;
+
+    // for scaling the character proportions
+    float proportionScaleX;
+    float proportionScaleY;
+
+    float unk_28[2];
+
+    // base index for texture count
+    uint32_t textureIndex; // used for mem alloc
+
+    int errorGlyph;
+
+    // for getting a texture from a provided unicode/glyph
+    PagePtr_t glyphChunks;
+    PagePtr_t unicodeChunks; // index per 64 unicodes, index into other arrays to get assigned texture (unicodeBaseIndex & unicodeIndexMask)
+    PagePtr_t glyphChunksIndex;
+    PagePtr_t unicodeChunksIndex; // the base texture index, added with popcount from unicodeIndexMask
+    PagePtr_t glyphChunksMask;
+    PagePtr_t unicodeChunksMask; // each bit represents a single unicode
+
+    PagePtr_t proportions; // array of vector2d
+    PagePtr_t glyphTextures; // per texture, 32 bytes
+    PagePtr_t unicodeTextures;
+
+    PagePtr_t unk_80;
+
+    PagePtr_t unk_88;
+};
+
+// asset header
+struct UIFontAtlasAssetHeader_v6_t
+{
+    uint16_t fontCount;
+    uint16_t unk_2; // count for the data at unk_18
+
+    uint16_t width;
+    uint16_t height;
+
+    // like ui image atlas
+    float widthRatio;
+    float heightRatio;
+
+    PagePtr_t fonts;
+    PagePtr_t unk_18;
+
+    uint64_t atlasGUID; // guid
+};
+
+struct UIFontAtlasAssetHeader_v12_t
+{
+    uint16_t fontCount;
+    uint16_t unk_2; // count for the data at unk_40
+
+    uint16_t width;
+    uint16_t height;
+
+    // like ui image atlas
+    float widthRatio;
+    float heightRatio;
+
+    char unk_10[40];
+
+    PagePtr_t fonts;
+    PagePtr_t unk_40; // previously unk_18
+
+    uint64_t atlasGUID; // guid
+
+    PagePtr_t unk_50;
+    PagePtr_t unk_58;
+    int unk_60[2];
+};
+
+struct font_data(local int version, local int64_t& baseptr)
+{
+    FSeek(baseptr);
+    switch (version)
+    {
+    case 6:
+    {
+        UIFontHeader_v6_t font;
+        break;
+    }
+    case 7:
+    case 10:
+    {
+        UIFontHeader_v7_t font;
+        break;
+    }
+    case 12:
+    {
+        UIFontHeader_v12_t font;
+        break;
+    }
+    };
+
+    if (PtrIsValid(font.name))
+    {
+        PageSeek(font.name);
+        string name;
+    }
+
+    if (exists(font.numProportions))
+    {
+        PageSeek(font.proportions);
+        switch (version)
+        {
+        case 7:
+        case 10:
+        {
+            UIFontProportion_v7_t proportions[font.numProportions];
+            break;
+        }
+        case 12:
+        {
+            UIFontProportion_v12_t proportions[font.numProportions];
+            break;
+        }
+        };
+    }
+
+    // unicode/glyph maps
+    local int numChunkExtra = 0;
+    local int chunkIdx = 0;
+
+    if (exists(font.unicodeMap) && PtrIsValid(font.unicodeMap))
+    {
+        PageSeek(font.unicodeMap);
+        UIFontUnicodeMap_t unicodeMaps[font.numUnicodeMaps];        
+    }
+    else
+    {
+        PageSeek(font.unicodeChunks);
+        uint16_t unicodeChunks[font.numUnicodeChunks];
+
+        for (numChunkExtra = 0, chunkIdx = 0; chunkIdx < font.numUnicodeChunks; chunkIdx++)
+        {
+            numChunkExtra = unicodeChunks[chunkIdx] > numChunkExtra ? unicodeChunks[chunkIdx] : numChunkExtra;
+        }
+
+        numChunkExtra += 1;
+
+        PageSeek(font.unicodeChunksIndex);
+        uint16_t unicodeChunksIndex[numChunkExtra];
+
+        PageSeek(font.unicodeChunksMask);
+        uint64_t unicodeChunksMask[numChunkExtra];
+    }
+
+    if (exists(font.glyphChunks))
+    {
+        PageSeek(font.glyphChunks);
+        uint16_t glyphChunks[font.numGlyphChunks];
+
+        for (numChunkExtra = 0, chunkIdx = 0; chunkIdx < font.numGlyphChunks; chunkIdx++)
+        {
+            numChunkExtra = glyphChunks[chunkIdx] > numChunkExtra ? glyphChunks[chunkIdx] : numChunkExtra;
+        }
+
+        numChunkExtra += 1;
+
+        PageSeek(font.glyphChunksIndex);
+        uint16_t glyphChunksIndex[numChunkExtra];
+
+        PageSeek(font.glyphChunksMask);
+        uint64_t glyphChunksMask[numChunkExtra];
+    }
+
+    // some unknown data
+    local PagePtr_t unkPtr;
+    switch (version)
+    {
+    case 6:
+    {
+        unkPtr.index = font.unk_38.index;
+        unkPtr.offset = font.unk_38.offset;      
+
+        break;
+    }
+    case 7:
+    case 10:
+    {
+        unkPtr.index = font.unk_58.index;
+        unkPtr.offset = font.unk_58.offset;      
+
+        break;
+    }
+    case 12:
+    {
+        unkPtr.index = font.unk_88.index;
+        unkPtr.offset = font.unk_88.offset;      
+
+        break;
+    }
+    };
+
+    if (PtrIsValid(unkPtr))
+    {
+        PageSeek(unkPtr);
+        UIFont_UNK_t unk_0[font.numGlyphChunks]; // not correct for v12
+    }
+
+    // textures
+    if (exists(font.textures))
+    {
+        PageSeek(font.textures);
+        switch (version)
+        {
+        case 6:
+        {
+            UIFontTexture_v6_t textures[font.numTextures];
+            break;
+        }
+        case 7:
+        case 10:
+        {
+            UIFontTexture_v7_t textures[font.numTextures];
+            break;
+        }
+        };
+    }
+
+    if (exists(font.unicodeTextures))
+    {
+        PageSeek(font.unicodeTextures);
+        UIFontTexture_v12_t unicodeTextures[font.numUnicodeTextures];
+    }
+
+    if (exists(font.glyphTextures))
+    {
+        PageSeek(font.glyphTextures);
+        UIFontTexture_v12_t glyphTextures[font.numGlyphTextures];
+    }
+
+    baseptr += sizeof(font);
+};
+
+void HandleUIFontAtlas(PakAsset_t& asset, uint64_t pageoffsets[])
+{
+    PageSeek(asset.headPagePtr);
+    switch (asset.version)
+    {
+    case 6:
+    case 7:
+    case 10:
+    {
+        UIFontAtlasAssetHeader_v6_t hdr;
+        break;
+    }
+    case 12:
+    {
+        UIFontAtlasAssetHeader_v12_t hdr;
+        break;
+    }
+    };
+
+    local int fontIdx = 0;
+    local int64_t baseptr = PageTell(hdr.fonts);
+    for (fontIdx = 0; fontIdx < hdr.fontCount; fontIdx++)
+    {
+        FSeek(startof(page_data));
+        font_data font(asset.version, baseptr) <read=PageString(font.name)>;  
+    }
+
+    if (hdr.unk_2)
+    {
+        if (exists(hdr.unk_18))
+            PageSeek(hdr.unk_18);
+        if (exists(hdr.unk_40))
+            PageSeek(hdr.unk_40);
+
+        char unk_18[hdr.unk_2 * 4]; // not accurate
+    }
+}

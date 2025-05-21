@@ -1,13 +1,13 @@
 //------------------------------------------------
 //--- 010 Editor v12.0.1 Binary Template
 //
-//      File: rpak_v7.bt
+//      File: rpak_v6.bt
 //   Authors: Rika
 //   Version: 0.1
 //   Purpose: Respawn Pak Files
 //  Category: Archive
 // File Mask: *.rpak
-//  ID Bytes: 52 50 61 6b 07
+//  ID Bytes: 52 50 61 6b 06
 //   History: 
 //------------------------------------------------
 
@@ -62,23 +62,14 @@ struct PakHdr_t
     uint64_t createdTime;
     uint64_t crc;
 
-    int64_t cmpSize; // compressed data size
+    int64_t size; // data size
 
-    char pad_0020[8];
+    char pad_0020[16];
 
-    int64_t dcmpSize; // decompressed file size. will be the same as cmpSize if compressed flag is not set
+    int streamingFilesBufSize;
 
-    char pad_0030[8];
-
-    short streamingFilesBufSize;
-
-    uint16_t numSegments;
-    uint16_t numPages;
-
-    // (01).rpak - 1: base
-    // (02).rpak - 2: base, (01)
-    // (03).rpak - 3: base, (01), (02)
-    short patchCount; // actually might be the number of pak files "under" this one
+    int numSegments;
+    int numPages;
 
     int numPointers;
     int numAssets;
@@ -87,6 +78,8 @@ struct PakHdr_t
 
     int numExternalAssetRefs;
     int externalAssetRefsSize;
+
+    int unk_0054;
 };
 
 #include "./pakfile_core.bt"

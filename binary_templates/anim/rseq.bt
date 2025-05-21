@@ -83,6 +83,30 @@ if (seqdesc.weightlistindex == 1 || seqdesc.weightlistindex == 3)
     canParseAnim = false;
 }
 
+// HACK HACK
+// this works because the first bone normally has fixed position or rotation making the size > 0x8
+// and if an animation has a track it will also be larger than 0x8
+// note: this could be used for an external data template
+void BoneCountCheat(const int64_t baseptr)
+{
+    if (boneCount == 0 && !canParseAnim)
+    {
+        FSeek(baseptr);
+        nibble tmpFlags[256] <optimize=false, hidden=true>;
+        local uint8_t tmpFlag = 0;
+
+        local int tmpIdx = 0;
+        for (tmpIdx = 0; tmpIdx < 256; tmpIdx++)
+        {
+            tmpFlag = tmpFlags[tmpIdx].bits;
+            if (tmpFlag & 0x8)
+                break;
+        }
+
+        boneCount = (tmpIdx / 2) * 2;
+    }
+}
+
 // pose keys
 if(seqdesc.posekeyindex)
 {
@@ -161,12 +185,17 @@ struct rle_value
     }
 };
 
-struct rle_valuetrack(int k)
+struct rle_valuetrack(int frameCount)
 {
     rle_value value;
     FSeek(startof(value.value) + (GetAnimValueOffset(value.value) * sizeof(mstudioanimvalue_t)));
 
     local uint8_t total = value.value.num.total;
+    // on animations without sections the number of 'total' values will equal the number of frames
+    // on animations with sections, sections preceeding the last sectiion will have a 'total' of (sectionframes + 1)
+    // the extra value is seemingly the first value of the next section.
+    // this difference is handled when passed to the func
+    local int k = frameCount;
 
     while(total <= k)
     {
@@ -261,9 +290,12 @@ struct rle_bone(const uint8_t boneFlags, const int frameCount)
     }
 };
 
-struct rle_anim(const uint64_t baseptr, const int animindex, const int boneCount, const int frameCount)
+struct rle_anim(const uint64_t baseptr, const int animindex, const int frameCount)
 {
     local const uint64_t animbase = (baseptr + animindex);
+
+    // for anims without weightlist
+    BoneCountCheat(animbase);
 
     FSeek(animbase);
     struct {
@@ -451,7 +483,7 @@ void ParseAnimdesc(const uint64_t baseptr, const uint16_t animindex)
         if (!(animdesc.flags & ANIM_VALID))
             return;
 
-        if (animdesc.sectionframes > 0 && canParseAnim)
+        if (animdesc.sectionframes > 0)
         {
             // this equation gets the max INDEX of the array, if we add one to this, we'll get the section count
             local const int sectionCount = useStallFrameCount ?
@@ -480,14 +512,14 @@ void ParseAnimdesc(const uint64_t baseptr, const uint16_t animindex)
                     GetMaxFrameForSection(animdesc.numframes, animdesc.sectionframes, j, sectionCount);
 
                 FSeek(startof(animdesc) + sections[j].animindex);
-                rle_anim section(startof(animdesc), sections[j].animindex, boneCount, maxFrames);
+                rle_anim section(startof(animdesc), sections[j].animindex, maxFrames);
             };
         }
 
-        if (animdesc.sectionframes == 0 && canParseAnim)
+        if (animdesc.sectionframes == 0)
         {
             FSeek(startof(animdesc) + animdesc.animindex);
-            rle_anim animation(startof(animdesc), animdesc.animindex, boneCount, animdesc.numframes - 1);
+            rle_anim animation(startof(animdesc), animdesc.animindex, animdesc.numframes - 1);
         }
 
         if(animdesc.numikrules && !(animdesc.ikruleindex == 3 || animdesc.ikruleindex == 5))
@@ -508,7 +540,6 @@ void ParseAnimdesc(const uint64_t baseptr, const uint16_t animindex)
     } anim <read=ReadString(startof(this.animdesc) + this.animdesc.sznameindex)>;
 }
 
-local int i = 0;
 for(i = 0; i < animCount; i++)
 {
     ParseAnimdesc(startof(seqdesc), blends[i]);

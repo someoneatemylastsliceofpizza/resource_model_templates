@@ -1,0 +1,62 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: pakfile_rpsk.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Pak Files
+//  Category: Archive
+// File Mask: *.rpak
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+const uint32_t ID_RPSK = 0x6B737072;
+
+struct ParticleScriptAssetHeader_v8_t
+{
+    uint64_t textures[2];
+
+    // texture input slots ?
+    char unk_10[16];
+
+    uint64_t unk_20[4];
+
+    PagePtr_t name;
+
+    PagePtr_t uberStaticBuffer;
+
+    uint64_t systemEffectComputeShader;
+    uint64_t processComputeShader;
+    uint64_t renderVertexShader;
+    uint64_t renderGeometryShader;
+    uint64_t renderPixelShader;
+
+    uint32_t unk_78;
+
+    uint32_t uberStaticBufferSize;
+
+    char unk_80[8]; // last two null and never referenced in update func (whereas first six are)
+};
+
+void HandleParticleScript(PakAsset_t& asset, uint64_t pageoffsets[])
+{
+    PageSeek(asset.headPagePtr);
+    switch (asset.version)
+    {
+    case 8:
+    {
+        ParticleScriptAssetHeader_v8_t hdr;
+        break;
+    }
+    };
+
+    PageSeek(hdr.name);
+    string name;
+
+    if (PtrIsValid(hdr.uberStaticBuffer))
+    {
+        PageSeek(hdr.uberStaticBuffer);
+        char uberStaticBuffer[hdr.uberStaticBufferSize];
+    }
+}

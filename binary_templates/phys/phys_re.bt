@@ -100,7 +100,6 @@ struct edge_v10_t
 phyheader_t header <bgcolor=cLtRed>;
 phyptrheader_t ptrheader <bgcolor=cRed>;
 
-local int i = 0;
 local int solidIdx = 0;
 
 for(i = 0; i < header.solidCount; i++)
