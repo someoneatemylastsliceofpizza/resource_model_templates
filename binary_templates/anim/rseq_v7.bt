@@ -221,7 +221,6 @@ int GetRMDLOffset(int offset)
     return offset;
 }
 
-const bool useStallFrameCount = false;
-const bool useBigNumbers = true;
+#define USE_BIG_NUMBERS
 
 #include "./rseq.bt"

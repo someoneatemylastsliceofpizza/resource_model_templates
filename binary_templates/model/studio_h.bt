@@ -1,0 +1,268 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: studio_h.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Model Files
+//  Category: Model
+// File Mask: *.mdl
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+#include "../source_math.bt"
+
+#ifndef STUDIO_H
+#define STUDIO_H
+
+#define MAX_NUM_LODS 8
+
+//
+// bones
+//
+
+// this struct is the same in r1 and r2, and unchanged from p2
+struct mstudiojigglebone_t
+{
+	int flags;
+
+	// general params
+	float length; // how far from bone base, along bone, is tip
+	float tipMass;
+
+	// flexible params
+	float yawStiffness;
+	float yawDamping;
+	float pitchStiffness;
+	float pitchDamping;
+	float alongStiffness;
+	float alongDamping;
+
+	// angle constraint
+	float angleLimit; // maximum deflection of tip in radians
+
+	// yaw constraint
+	float minYaw; // in radians
+	float maxYaw; // in radians
+	float yawFriction;
+	float yawBounce;
+
+	// pitch constraint
+	float minPitch; // in radians
+	float maxPitch; // in radians
+	float pitchFriction;
+	float pitchBounce;
+
+	// base spring
+	float baseMass;
+	float baseStiffness;
+	float baseDamping;
+	float baseMinLeft;
+	float baseMaxLeft;
+	float baseLeftFriction;
+	float baseMinUp;
+	float baseMaxUp;
+	float baseUpFriction;
+	float baseMinForward;
+	float baseMaxForward;
+	float baseForwardFriction;
+};
+
+struct mstudiolinearbone_t
+{
+	int numbones;
+
+	int flagsindex;
+
+	int	parentindex;
+
+	int	posindex;
+
+	int quatindex;
+
+	int rotindex;
+
+	int posetoboneindex;
+
+	int	posscaleindex;
+
+	int	rotscaleindex;
+
+	int	qalignmentindex;
+
+	int unused[6];
+};
+
+// this struct is the same in r1 and r2, and unchanged from p2
+struct mstudiosrcbonetransform_t
+{
+	int			sznameindex;
+	matrix3x4_t	pretransform;
+	matrix3x4_t	posttransform;
+};
+
+struct mstudioattachment_t
+{
+	int sznameindex;
+	unsigned int flags;
+	int localbone;
+	matrix3x4_t local0; // attachment point
+	int unused[8];
+};
+
+// this struct is the same in r1 and r2, and unchanged from p2
+struct mstudiohitboxset_t
+{
+	int sznameindex;
+	int numhitboxes;
+	int hitboxindex;
+};
+
+//
+// animations
+//
+struct mstudioanimblock_t
+{
+	int datastart;
+	int dataend;
+};
+
+struct mstudiomovement_t
+{
+	int endframe;
+	int motionflags;
+	float v0;			// velocity at start of block
+	float v1;			// velocity at end of block
+	float angle;		// YAW rotation at end of this blocks movement
+	Vector vector;		// movement vector relative to this blocks initial angle
+	Vector position;	// relative to start of animation???
+};
+
+struct mstudioframemovement_t
+{
+	float scale[4];
+	short offset[4];
+};
+
+// these should not be present in respawn games, as it was deprecated during hl2's development, despite this support for them remains even up to modern r5.
+struct mstudioikerror_t
+{
+	Vector pos;
+	Quaternion q;
+};
+
+struct mstudiocompressedikerror_t
+{
+	float scale[6];
+	short offset[6];
+};
+
+struct mstudioevent_t
+{
+	float	cycle;
+	int		event;
+	int		type;
+	char	options[64];
+
+	int		szeventindex;
+};
+
+struct mstudioautolayer_t
+{
+	short iSequence;
+	short iPose;
+
+	int flags;
+	float start;	// beginning of influence
+	float peak;	// start of full influence
+	float tail;	// end of full influence
+	float end;	// end of all influence
+};
+
+struct mstudiomodelgroup_t
+{
+	int szlabelindex;	// textual name
+
+	int sznameindex;	// file name
+};
+
+//
+// meshes
+//
+struct mstudio_meshvertexloddata_t
+{
+	int modelvertexdataUnusedPad; // likely has none of the funny stuff because unused
+
+	int numLODVertexes[MAX_NUM_LODS]; // depreciated starting with rmdl v14(?)
+};
+
+struct mstudiobodyparts_t
+{
+	int sznameindex;
+
+	int nummodels;
+	int base;
+	int modelindex; // index into models array
+};
+
+struct mstudioposeparamdesc_t
+{
+	int sznameindex;
+
+	int flags;	// ????
+	float start;	// starting value
+	float end;	// ending value
+	float loop;	// looping range, 0 for no looping, 360 for rotations, etc.
+};
+
+//
+// collision
+//
+struct mstudiopertrivertex_t
+{
+	// to get float value:
+	// axisValue * ((float)(bbmax.axis - bbmin.axis) * 0.000015259022)
+	// where axis is x, y, or z. bbmax and bbmin are from the pertri header.
+	short x, y, z;
+};
+
+struct mstudiopertrileaftri_t
+{
+	short vertIndices[3];
+	short unk_0x6; // very odd, this value seems to match all tris on all leaves in file. varies per file
+};
+
+struct mstudiopertrileaf_t
+{
+	// bounds, probably calculated the same as vert pos. needs to be checked
+	short min[3];
+	short max[3];
+
+	int unk_0xC; // homestead_ter_road_01_nocol.mdl (nocol ironic)
+
+	mstudiopertrileaftri_t triangles[12];
+};
+
+struct mstudiopertrinode_t
+{
+	// what
+	short unk_0x0[6];
+
+	// node / leaf indices, zero or greater is node, neg one or less is leaf
+	//int child0Index;
+	//int child1Index;
+	int childIndex[2];
+};
+
+struct mstudiopertrihdr_t
+{
+	int version; // game expects 0 or 2, 0 for no data/not used, 2 for when there is data/it is used.
+
+	Vector bbmin;
+	Vector bbmax;
+
+	int unused[8];
+};
+
+#endif

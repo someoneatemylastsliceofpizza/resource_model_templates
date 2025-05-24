@@ -225,20 +225,8 @@ int GetRMDLOffset(unsigned short offset)
     return fixedOffset;
 }
 
-const bool useStallFrameCount = true;
-const bool useBigNumbers = false;
-
+#define FEATURE_STALL
+#define FEATURE_NOINTERPFRAMES
+#define FEATURE_STATICSTRUCTS
 
 #include "./rseq.bt"
-
-if (seqdesc.noInterpFrameCount)
-{
-    local const int dataSize = GetRMDLOffset(seqdesc.szlabelindex) - GetRMDLOffset(seqdesc.noInterpFrameOffset);
-    local const bool usePairs = seqdesc.noInterpFrameCount * sizeof(mstudio_nointerpframes_t) == dataSize;
-
-    FSeek(startof(seqdesc) + GetRMDLOffset(seqdesc.noInterpFrameOffset));
-    if (usePairs)
-        mstudio_nointerpframes_t nointerpframes[seqdesc.noInterpFrameCount]  <fgcolor=0x60e060>;
-    else
-        int nointerpframes[seqdesc.noInterpFrameCount] <fgcolor=0x60e060>;
-}

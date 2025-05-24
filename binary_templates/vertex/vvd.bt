@@ -74,7 +74,7 @@ struct mstudiovertex_t
 /* PARSE DATA*/
 vertexFileHeader_t hdr <bgcolor=cYellow>;
 
-if(hdr.fixupTableStart > 0)
+if(hdr.fixupTableStart > 0 && hdr.numFixups)
 {
     FSeek(startof(hdr) + hdr.fixupTableStart);
     vertexFileFixup_t fixup[hdr.numFixups] <bgcolor=cDkYellow>;

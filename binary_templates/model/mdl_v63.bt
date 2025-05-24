@@ -1,0 +1,21 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: mdl_v63.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Model Files
+//  Category: Model
+// File Mask: *.mdl
+//  ID Bytes: 54 53 44 49 00 00 00 3f
+//   History: 
+//------------------------------------------------
+
+BigEndian();
+
+#define FEATURE_BPANIM
+
+#include "./mdl_v52.bt"
+
+// todo :r1x360 does not store textures in the file, this causes issues in many places
+// todo: r1x360 has some extra data that uses the flex fields

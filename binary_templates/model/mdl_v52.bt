@@ -1,0 +1,570 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: mdl_v52.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Model Files
+//  Category: Model
+// File Mask: *.mdl
+//  ID Bytes: 49 44 53 54 34
+//   History: 
+//------------------------------------------------
+
+#include "../source_math.bt"
+#include "./studio_h.bt"
+
+// headers
+struct studiohdr_t
+{
+	int id; // Model format ID, such as "IDST" (0x49 0x44 0x53 0x54)
+	int version; // Format version number, such as 52 (0x34,0x00,0x00,0x00)
+	int checksum; // This has to be the same in the phy and vtx files to load!
+	char name[64]; // The internal name of the model, padding with null chars.
+	int length; // Data size of MDL file in chars.
+
+	Vector eyeposition;	// ideal eye position
+
+	Vector illumposition;	// illumination center
+
+	Vector hull_min;		// ideal movement hull size
+	Vector hull_max;
+
+	Vector view_bbmin;		// clipping bounding box
+	Vector view_bbmax;
+
+	int flags;
+
+	// highest observed: 250
+	// max is definitely 256 because 8bit uint limit
+	int numbones; // bones
+	int boneindex;
+
+	int numbonecontrollers; // bone controllers
+	int bonecontrollerindex;
+
+	int numhitboxsets;
+	int hitboxsetindex;
+
+	int numlocalanim; // animations/poses
+	int localanimindex; // animation descriptions
+
+	int numlocalseq; // sequences
+	int	localseqindex;
+
+	int activitylistversion; // initialization flag - have the sequences been indexed?
+	int eventsindexed;
+
+	// raw textures
+	int numtextures;
+	int textureindex;
+
+	// raw textures search paths
+	int numcdtextures;
+	int cdtextureindex;
+
+	// replaceable textures tables
+	int numskinref;
+	int numskinfamilies;
+	int skinindex;
+
+	int numbodyparts;
+	int bodypartindex;
+
+	int numlocalattachments;
+	int localattachmentindex;
+
+	int numlocalnodes;
+	int localnodeindex;
+	int localnodenameindex;
+
+	int deprecated_numflexdesc;
+	int deprecated_flexdescindex;
+
+	int deprecated_numflexcontrollers;
+	int deprecated_flexcontrollerindex;
+
+	int deprecated_numflexrules;
+	int deprecated_flexruleindex;
+
+	int numikchains;
+	int ikchainindex;
+
+	int deprecated_nummouths;
+	int deprecated_mouthindex;
+
+	int numlocalposeparameters;
+	int localposeparamindex;
+
+	int surfacepropindex;
+
+	int keyvalueindex;
+	int keyvaluesize;
+
+	int numlocalikautoplaylocks;
+	int localikautoplaylockindex;
+
+	float mass;
+	int contents;
+
+	// external animations, models, etc.
+	int numincludemodels;
+	int includemodelindex;
+
+	// implementation specific back pointer to virtual data
+	int /* mutable void* */ virtualModel;
+
+	// for demand loaded animation blocks
+	int szanimblocknameindex;
+
+	int numanimblocks;
+	int animblockindex;
+
+	int /* mutable void* */ animblockModel;
+
+	int bonetablebynameindex;
+
+	// used by tools only that don't cache, but persist mdl's peer data
+	// engine uses virtualModel to back link to cache pointers
+	int /* void* */ pVertexBase;
+	int /* void* */ pIndexBase;
+
+	// if STUDIOHDR_FLAGS_CONSTANT_DIRECTIONAL_LIGHT_DOT is set,
+	// this value is used to calculate directional components of lighting 
+	// on static props
+	char constdirectionallightdot;
+
+	// set during load of mdl data to track *desired* lod configuration (not actual)
+	// the *actual* clamped root lod is found in studiohwdata
+	// this is stored here as a global store to ensure the staged loading matches the rendering
+	char rootLOD;
+
+	// set in the mdl data to specify that lod configuration should only allow first numAllowRootLODs
+	// to be set as root LOD:
+	//	numAllowedRootLODs = 0	means no restriction, any lod can be set as root lod.
+	//	numAllowedRootLODs = N	means that lod0 - lod(N-1) can be set as root lod, but not lodN or lower.
+	char numAllowedRootLODs;
+
+	char unused;
+
+	float fadeDistance;	// set to -1 to never fade. set above 0 if you want it to fade out, distance is in feet.
+	// player/titan models seem to inherit this value from the first model loaded in menus.
+	// works oddly on entities, probably only meant for static props
+
+	int deprecated_numflexcontrollerui;
+	int deprecated_flexcontrolleruiindex;
+
+	float flVertAnimFixedPointScale;
+	int surfacepropLookup;	// this index must be cached by the loader, not saved in the file
+
+	// NOTE: No room to add stuff? Up the .mdl file format version 
+	// [and move all fields in studiohdr2_t into studiohdr_t and kill studiohdr2_t],
+	// or add your stuff to studiohdr2_t. See NumSrcBoneTransforms/SrcBoneTransform for the pattern to use.
+	int studiohdr2index;
+
+	// stored maya files from used dmx files, animation files are not added. for internal tools likely
+	// in r1 this is a mixed bag, some are null with no data, some have a four byte section, and some actually have the files stored.
+	int sourceFilenameOffset;
+};
+
+struct studiohdr2_t
+{
+	int numsrcbonetransform;
+	int srcbonetransformindex;
+
+	int	illumpositionattachmentindex;
+
+	float flMaxEyeDeflection; // default to cos(30) if not set
+
+	int linearboneindex;
+
+	int sznameindex;
+
+	int m_nBoneFlexDriverCount;
+	int m_nBoneFlexDriverIndex;
+
+	// for static props (and maybe others)
+	// Precomputed Per-Triangle AABB data
+	int m_nPerTriAABBIndex;
+	int m_nPerTriAABBNodeCount;
+	int m_nPerTriAABBLeafCount;
+	int m_nPerTriAABBVertCount;
+
+	// always "" or "Titan"
+	int unkStringOffset;
+
+	int reserved[39];
+};
+
+// bones
+struct mstudiobone_t
+{
+	int sznameindex;
+
+	int parent; // parent bone
+	int bonecontroller[6]; // bone controller index, -1 == none
+
+	// default values
+	Vector pos; // base bone position
+	Quaternion quat;
+	RadianEuler rot; // base bone rotation
+
+	// compression scale
+	Vector posscale; // scale muliplier for bone position in animations. depreciated in v53, as the posscale is stored in anim bone headers
+	Vector rotscale; // scale muliplier for bone rotation in animations
+
+	matrix3x4_t poseToBone;
+	Quaternion qAlignment;
+
+	int flags;
+	int proctype;
+	int procindex; // procedural rule offset
+	int physicsbone; // index into physically simulated bone
+	// from what I can tell this is the section that is parented to this bone, and if this bone is not the parent of any sections, it goes up the bone chain to the nearest bone that does and uses that section index
+	int surfacepropidx; // index into string tablefor property name
+
+	int contents; // See BSPFlags.h for the contents flags
+
+	int surfacepropLookup; // this index must be cached by the loader, not saved in the file
+
+	Vector scale; // base bone scale
+	Vector scalescale; // scale muliplier for bone scale in animations
+
+	int unused; // remove as appropriate
+};
+
+// unchanged from p2
+struct mstudiobbox_t
+{
+	int bone;
+	int group;				// intersection group
+	Vector bbmin;				// bounding box
+	Vector				bbmax;
+	int szhitboxnameindex;	// offset to the name of the hitbox.
+	int unused[8];
+};
+
+// animations
+struct mstudioiklink_t
+{
+	int		bone;
+	Vector	kneeDir;	// ideal bending direction (per link, if applicable)
+	Vector	unused0;	// unused
+};
+
+struct mstudioikchain_t
+{
+	int sznameindex;
+
+	int linktype;
+	int numlinks;
+	int linkindex;
+};
+
+#define STUDIO_ANIM_RAWPOS 0x01 // Vector48
+#define STUDIO_ANIM_RAWROT 0x02 // Quaternion48
+#define STUDIO_ANIM_ANIMPOS 0x04 // mstudioanim_valueptr_t
+#define STUDIO_ANIM_ANIMROT 0x08 // mstudioanim_valueptr_t
+#define STUDIO_ANIM_DELTA 0x10
+#define STUDIO_ANIM_RAWROT2 0x20 // Quaternion64
+#define STUDIO_ANIM_RAWSCALE 0x40 // Vector48
+#define STUDIO_ANIM_ANIMSCALE 0x80  // mstudioanim_valueptr_t 
+
+struct mstudio_rle_anim_t
+{
+	uint8_t bone;
+	uint8_t flags;
+
+	// points to next bone in the list
+	short nextoffset;
+};
+
+// used to seek directly to a bone's data instead of incrementing each time.
+struct mstudio_frame_anim_boneoffset_t
+{
+	uint16_t frameOffset; // offset from start of frame data for this bone's frame data
+	uint16_t constOffset; // offset from start of frame data for this bone's constant data
+};
+
+#define STUDIO_FRAME_RAWPOS 0x01 // Vector48 in constants
+#define STUDIO_FRAME_RAWROT 0x02 // Quaternion48 in constants
+#define STUDIO_FRAME_RAWSCALE 0x04 // Vector48 in constants, atlas_mp_scripted.mdl at_hotdrop_loop at_hotdrop_01
+#define STUDIO_FRAME_ANIMPOS 0x08 // Quaternion48 in framedata
+#define STUDIO_FRAME_ANIMROT 0x10 // Vector48 in framedata
+#define STUDIO_FRAME_ANIMSCALE 0x20 // Vector48 in framedata
+#define STUDIO_FRAME_FULLANIM 0x40 // use full size vectors (12 bytes) for scale and position.
+
+#define STUDIO_FRAME_CONSTDATA (STUDIO_FRAME_RAWPOS | STUDIO_FRAME_RAWROT | STUDIO_FRAME_RAWSCALE) // bone has const data
+#define STUDIO_FRAME_FRAMEDATA (STUDIO_FRAME_ANIMPOS | STUDIO_FRAME_ANIMROT | STUDIO_FRAME_ANIMSCALE) // bone has const data
+
+local uint8_t s_FrameAnimBoneSizeLUT[16] = { 0, 6, 6, 12, 6, 12, 12, 18, 0, 12, 6, 18, 12, 24, 18, 30 };
+
+struct mstudio_frame_anim_t
+{
+	int constantsoffset;
+
+	int frameoffset;
+	int framelength;
+
+	int fixedOldBoneflags; // uuuuuuhhmmm, unused (I think)
+
+	int boneLookupTableOffset; // table of offsets into a certain bone's data within a frame, if not preset use SkipBoneFrame() to progress track
+
+	int unused;
+};
+
+struct mstudioanimsections_t
+{
+	int animblock;
+	int animindex;
+};
+
+struct mstudioikrule_t
+{
+	int index;
+
+	int type;
+	int chain;
+
+	int	bone;
+
+	int slot;	// iktarget slot.  Usually same as chain.
+	float height;
+	float radius;
+	float floor;
+	Vector pos;
+	Quaternion q;
+
+	int compressedikerrorindex;
+
+	int unused2;
+
+	int iStart;
+	int ikerrorindex;
+
+	float start;	// beginning of influence
+	float peak;	// start of full influence
+	float tail;	// end of full influence
+	float end;	// end of all influence
+
+	float unused3;	// 
+	float contact;	// frame footstep makes ground concact
+	float drop;		// how far down the foot should drop when reaching for IK
+	float top;		// top of the foot box
+
+	int unused6;
+	int unused7;
+	int unused8;
+
+	int szattachmentindex; // name of world attachment
+
+	float endHeight; // new in v52
+
+	int unused[6];
+};
+
+// similar to p2 struct with some unused slots filled
+struct mstudioanimdesc_t
+{
+	int baseptr;
+
+	int sznameindex;
+
+	float fps; // frames per second	
+	int flags; // looping/non-looping flags
+
+	int numframes;
+
+	// piecewise movement
+	int	nummovements;
+	int movementindex;
+
+	int ikrulezeroframeindex;
+
+	int framemovementindex; // new in v52
+
+	int unused1[4]; // remove as appropriate (and zero if loading older versions)	
+
+	int animblock;
+	int animindex; // non-zero when anim data isn't in sections
+
+	int numikrules;
+	int ikruleindex; // non-zero when IK data is stored in the mdl
+	int animblockikruleindex; // non-zero when IK data is stored in animblock file
+
+	int numlocalhierarchy;
+	int localhierarchyindex;;
+
+	int sectionindex;
+	int sectionframes; // number of frames used in each fast lookup section, zero if not used
+
+	short zeroframespan; // frames per span
+	short zeroframecount; // number of spans
+	int zeroframeindex;
+
+	float zeroframestalltime; // saved during read stalls
+};
+
+struct mstudioactivitymodifier_t
+{
+	int sznameindex;
+	bool negate; // negate all other activity modifiers when this one is active?
+};
+
+struct mstudioseqdesc_t
+{
+	int baseptr;
+
+	int	szlabelindex;
+
+	int szactivitynameindex;
+
+	int flags; // looping/non-looping flags
+
+	int activity; // initialized at loadtime to game DLL values
+	int actweight;
+
+	int numevents;
+	int eventindex;
+
+	Vector bbmin; // per sequence bounding box
+	Vector bbmax;
+
+	int numblends;
+
+	// Index into array of shorts which is groupsize[0] x groupsize[1groupsize[1] in length
+	int animindexindex;
+
+	int movementindex; // [blend] float array for blended movement
+	int groupsize[2];
+	int paramindex[2]; // X, Y, Z, XR, YR, ZR
+	float paramstart[2]; // local (0..1) starting value
+	float paramend[2]; // local (0..1) ending value
+	int paramparent;
+
+	float fadeintime; // ideal cross fate in time (0.2 default)
+	float fadeouttime; // ideal cross fade out time (0.2 default)
+
+	int localentrynode; // transition node at entry
+	int localexitnode; // transition node at exit
+	int nodeflags; // transition rules
+
+	float entryphase; // used to match entry gait
+	float exitphase; // used to match exit gait
+
+	float lastframe; // frame that should generation EndOfSequence
+
+	int nextseq; // auto advancing sequences
+	int pose; // index of delta animation between end and nextseq
+
+	int numikrules;
+
+	int numautolayers;
+	int autolayerindex;
+
+	int weightlistindex;
+
+	int posekeyindex;
+
+	int numiklocks;
+	int iklockindex;
+
+	// Key values
+	int	keyvalueindex;
+	int keyvaluesize;
+
+	int cycleposeindex; // index of pose parameter to use as cycle index
+
+	int activitymodifierindex;
+	int numactivitymodifiers;
+
+	int ikResetMask; // new in v52
+	int unk1; // count? ikReset (what above var is masking)
+
+	int unused[3];
+};
+
+// meshes
+struct mstudiomesh_t
+{
+	int material;
+
+	int modelindex;
+
+	int numvertices; // number of unique vertices/normals/texcoords
+	int vertexoffset; // vertex mstudiovertex_t
+	// offset by vertexoffset number of verts into vvd vertexes, relative to the models offset
+
+	// Access thin/fat mesh vertex data (only one will return a non-NULL result)
+
+	int deprecated_numflexes; // vertex animation
+	int deprecated_flexindex;
+
+	// special codes for material operations
+	int deprecated_materialtype;
+	int deprecated_materialparam;
+
+	// a unique ordinal for this mesh
+	int meshid;
+
+	Vector center;
+
+	mstudio_meshvertexloddata_t vertexloddata;
+
+	int unused[8]; // remove as appropriate
+};
+
+struct mstudiomodel_t
+{
+	char name[64];
+
+	int type;
+
+	float boundingradius;
+
+	int nummeshes;
+	int meshindex;
+
+	// cache purposes
+	int numvertices; // number of unique vertices/normals/texcoords
+	int vertexindex; // vertex Vector
+	// offset by vertexindex number of chars into vvd verts
+	int tangentsindex; // tangents Vector
+	// offset by tangentsindex number of chars into vvd tangents
+
+	int numattachments;
+	int attachmentindex;
+
+	int deprecated_numeyeballs;
+	int deprecated_eyeballindex;
+
+	int pad[4];
+
+	int colorindex; // vertex color
+	// offset by colorindex number of chars into vvc vertex colors
+	int uv2index; // vertex second uv map
+	// offset by uv2index number of chars into vvc secondary uv map
+
+	int unused[4];
+};
+
+// materials
+struct mstudiotexture_t
+{
+	int sznameindex;
+
+	int unused_flags;
+	int used;
+	int unused1;
+
+	// these are turned into 64 bit ints on load and only filled in memory
+	int material_RESERVED;
+	int clientmaterial_RESERVED;
+
+	int unused[10];
+};
+
+#define FEATURE_HDR2
+#define FEATURE_FRAMEANIM
+
+#include "./mdl.bt"

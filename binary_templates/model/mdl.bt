@@ -1,0 +1,547 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: mdl.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Model Files
+//  Category: Model
+// File Mask: *.mdl
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+#include "./studio_h.bt"
+
+// headers
+studiohdr_t hdr <fgcolor=cLtBlue>;
+
+#ifdef FEATURE_HDR2
+if (exists(hdr.studiohdr2index))
+{
+    FSeek(startof(hdr) + hdr.studiohdr2index);
+    studiohdr2_t hdr2 <fgcolor=cDkBlue>;
+}
+#endif
+
+if (exists(hdr.sourceFilenameOffset) && hdr.sourceFilenameOffset > 0)
+{
+    FSeek(startof(hdr) + hdr.sourceFilenameOffset);
+    char sourceFilenames[hdr.boneindex - hdr.sourceFilenameOffset] <fgcolor=cRed>;
+}
+
+// bones
+FSeek(startof(hdr) + hdr.boneindex);
+mstudiobone_t bones[hdr.numbones] <fgcolor=cLtGreen, read=Str("name %s; parent %i;", ReadString(startof(this) + this.sznameindex), this.parent)>;
+
+// check if any bones have proc bones
+local bool hasProcBones = false;
+for (i = 0; i < hdr.numbones; i++)
+{
+    if (bones[i].procindex > 0)
+    {
+        hasProcBones = true;
+        break;
+    }
+}
+
+// if we have proc bones make em
+if (hasProcBones)
+{
+    struct
+    {
+        for (i = 0; i < hdr.numbones; i++)
+        {
+            if (bones[i].procindex == 0)
+                continue;
+    
+            FSeek(startof(bones[i]) + bones[i].procindex);
+            struct {
+                // todo: other proctypes (but I have literally never seen them used)
+                switch (bones[i].proctype)
+                {
+                case 5:
+                {
+                    local int boneid = i;
+                    mstudiojigglebone_t jigglebone <fgcolor=cGreen>;
+
+                    break;
+                }
+                default:
+                {
+                    Assert(false);
+                    break;
+                }
+                }   
+            } procbone <read=ReadString(startof(bones[this.boneid]) + bones[this.boneid].sznameindex)>;
+        }
+    } procbones;
+}
+
+if (hdr.numlocalattachments)
+{
+    FSeek(startof(hdr) + hdr.localattachmentindex);
+    mstudioattachment_t attachments[hdr.numlocalattachments] <fgcolor=0xcff5ca, read=Str("%s : %s", ReadString(startof(this) + this.sznameindex), ReadString(startof(bones[this.localbone]) + bones[this.localbone].sznameindex))>;
+}
+
+struct hitbox_t
+{
+    mstudiohitboxset_t hitboxset <fgcolor=0xf2e46a, read=ReadString(startof(this) + this.sznameindex)>;
+
+    if (hitboxset.numhitboxes)
+    {
+        FSeek(startof(hitboxset) + hitboxset.hitboxindex);
+        mstudiobbox_t bboxes[hitboxset.numhitboxes] <fgcolor=0xa29418>;
+    }
+};
+
+if (hdr.numhitboxsets > 1)
+{
+    struct {
+        for (i = 0; i < hdr.numhitboxsets; i++)
+        {
+            FSeek(startof(hdr) + hdr.hitboxsetindex + (sizeof(mstudiohitboxset_t) * i));
+            hitbox_t hitbox <read=ReadString(startof(this.hitboxset) + this.hitboxset.sznameindex)>;
+        }
+    } hitboxes <read=Str("%i hitbox sets", hdr.numhitboxsets)>;
+}
+else if (hdr.numhitboxsets == 1)
+{
+    FSeek(startof(hdr) + hdr.hitboxsetindex);
+    hitbox_t hitbox <read=ReadString(startof(this.hitboxset) + this.hitboxset.sznameindex)>;
+}
+
+FSeek(startof(hdr) + hdr.bonetablebynameindex);
+uint8_t bonetableByName[hdr.numbones] <read=ReadString(startof(bones[this]) + bones[this].sznameindex), fgcolor=cDkGreen>;
+
+// animation
+#include "./mdl_anim.bt"
+
+const local int boneCount = hdr.numbones;
+
+if (hdr.numlocalanim)
+{
+    FSeek(startof(hdr) + hdr.localanimindex);
+    struct {
+        local int animIdx;
+        for (animIdx = 0; animIdx < hdr.numlocalanim; animIdx++)
+            ParseAnimdesc(startof(hdr), hdr.localanimindex + (sizeof(mstudioanimdesc_t) * animIdx));
+    } anims;
+}
+
+if (hdr.numlocalseq)
+{
+    FSeek(startof(hdr) + hdr.localseqindex);
+    struct {
+        local int seqIdx;
+        for (seqIdx = 0; seqIdx < hdr.numlocalseq; seqIdx++)
+            ParseSeqdesc(startof(hdr), hdr.localseqindex + (sizeof(mstudioseqdesc_t) * seqIdx));
+    } seqs;
+}
+
+// todo: research how these work
+struct localnode_t(const int64_t pNodeData)
+{
+    int nodename <bgcolor=cDkYellow>;
+
+    local string name = ReadString(nodename);
+
+    // how do these work?
+    FSeek(pNodeData);
+    char nodetransitions[hdr.numlocalnodes] <bgcolor=cLtYellow/*, read=localnodedata.nodes[this].name*/>;
+};
+
+if(hdr.numlocalnodes > 0)
+{
+    FSeek(startof(hdr) + hdr.localnodenameindex);
+    
+    struct {
+        local int localNodeIdx;
+        for (localNodeIdx = 0; localNodeIdx < hdr.numlocalnodes; localNodeIdx++)
+        {
+            FSeek(startof(hdr) + hdr.localnodenameindex + (sizeof(int) * localNodeIdx));
+            localnode_t nodes(hdr.localnodeindex + (hdr.numlocalnodes * localNodeIdx)) <read=this.name>;
+        }
+    } localnodedata;
+}
+
+// mesh
+struct model_t
+{
+    mstudiomodel_t model <bgcolor=cDkGray>;
+
+    if (model.nummeshes)
+    {
+        FSeek(startof(model) + model.meshindex);
+        mstudiomesh_t meshes[model.nummeshes] <bgcolor=cLtGray, read=ReadString(startof(textures[this.material]) + textures[this.material].sznameindex)>;
+    }
+};
+
+struct bodypart_t
+{
+    mstudiobodyparts_t bodypart <fgcolor=cGray, read=ReadString(startof(this) + this.sznameindex)>;
+
+    local int modelIdx = 0;
+    for (modelIdx = 0; modelIdx < bodypart.nummodels; modelIdx++)
+    {
+        FSeek(startof(bodypart) + bodypart.modelindex + (sizeof(mstudiomodel_t) * modelIdx));
+        model_t models <read=Str("%s with %i meshes", this.model.name, this.model.nummeshes)>;
+    }
+};
+
+if(hdr.numbodyparts)
+{
+    FSeek(hdr.bodypartindex);
+    struct {
+        for (i = 0; i < hdr.numbodyparts; i++)
+        {
+            FSeek(startof(hdr) + hdr.bodypartindex + (sizeof(mstudiobodyparts_t) * i));
+            bodypart_t bodypart <read=Str("%s with %i models", ReadString(startof(this.bodypart) + this.bodypart.sznameindex), this.bodypart.nummodels)>;
+        }
+    } bodyparts <read=Str("%i bodyparts", hdr.numbodyparts)>;
+};
+
+// flexes if i do v49
+
+// animation 2
+struct ikchain_t
+{
+    mstudioikchain_t ikchain <fgcolor=0xe8daef, read=ReadString(startof(this) + this.sznameindex)>;
+
+    FSeek(startof(ikchain) + ikchain.linkindex);
+    mstudioiklink_t iklinks[ikchain.numlinks] <fgcolor=0x7d3c98, read=ReadString(startof(bones[this.bone]) + bones[this.bone].sznameindex)>;
+};
+
+if(hdr.numikchains)
+{
+    FSeek(hdr.ikchainindex);
+    struct {
+        for(i = 0; i < hdr.numikchains; i++)
+        {
+            FSeek(startof(hdr) + hdr.ikchainindex + (sizeof(mstudioikchain_t) * i));
+            ikchain_t ikchain <read=ReadString(startof(this.ikchain) + this.ikchain.sznameindex)>;
+            
+        }
+    } ikchains <read=Str("%i ikchains", hdr.numikchains)>;
+}
+
+// iklock ??? check if used in r1/r2
+
+if (hdr.numlocalposeparameters)
+{
+    FSeek(startof(hdr) + hdr.localposeparamindex);
+    mstudioposeparamdesc_t poseparams[hdr.numlocalposeparameters] <fgcolor=cYellow, read=ReadString(startof(this) + this.sznameindex)>;
+}
+
+// animblocks
+#ifdef FEATURE_FRAMEANIM
+Assert(exists(hdr.szanimblocknameindex));
+Assert(exists(hdr.numanimblocks));
+Assert(exists(hdr.animblockindex));
+
+if (hdr.numanimblocks)
+{
+    FSeek(startof(hdr) + hdr.animblockindex);
+    mstudioanimblock_t animblocks[hdr.numanimblocks] <fgcolor=0xdc7633>;
+}
+#endif
+
+// ui panels
+#ifdef FEATURE_UIPANELS
+Assert(exists(hdr.uiPanelCount));
+Assert(exists(hdr.uiPanelOffset));
+
+struct uipanel_t
+{
+    UIPanelHeader_s hdr <fgcolor=cLtGreen>;
+
+    FSeek(startof(hdr) + hdr.meshOffset);
+    UIPanelMesh_s mesh <fgcolor=cGreen>;
+    string meshName <fgcolor=cGreen>;
+
+    FSeek(startof(mesh) + mesh.parentOffset);
+    short parents[mesh.parentCount] <fgcolor=cGreen, read=ReadString(startof(bones[this]) + bones[this].sznameindex)>;
+
+    FSeek(startof(mesh) + mesh.indiceOffset);
+    UIPanelIndices_s indices[mesh.faceCount] <fgcolor=cGreen>; // vertex map for each face
+    
+    FSeek(startof(mesh) + mesh.vertexOffset);
+    UIPanelVertex_s vertices[mesh.vertexCount] <fgcolor=cGreen>;
+    
+    FSeek(startof(mesh) + mesh.boundsOffset);
+    UIPanelBounds_s bounds[mesh.faceCount] <fgcolor=cGreen>;
+};
+
+if (hdr.uiPanelCount)
+{
+    FSeek(startof(hdr) + hdr.uiPanelOffset);
+    struct {
+        local int panelCount = hdr.uiPanelCount;
+        local int panelIdx;
+        for (panelIdx = 0; panelIdx < hdr.uiPanelCount; panelIdx++)
+        {
+            FSeek(hdr.uiPanelOffset + (sizeof(UIPanelHeader_s) * panelIdx));
+            uipanel_t uipanel <read=this.meshName>;
+        }
+    } uipanels <read=Str("%i panels", panelCount)>;
+};
+#endif
+
+if (hdr.numincludemodels)
+{
+    FSeek(startof(hdr) + hdr.includemodelindex);
+    mstudiomodelgroup_t includemodels[hdr.numincludemodels] <fgcolor=cLtBlue, read=ReadString(startof(this) + this.sznameindex)>;
+}
+
+
+// material
+if (hdr.numtextures)
+{
+    FSeek(startof(hdr) + hdr.textureindex);
+    mstudiotexture_t textures[hdr.numtextures] <fgcolor=cGreen, read=ReadString(startof(this) + this.sznameindex)>;
+}
+
+if (hdr.numcdtextures)
+{   
+    FSeek(startof(hdr) + hdr.cdtextureindex);
+    int cdtextures[hdr.numcdtextures] <bgcolor=cDkGreen, read=ReadString(this)>;
+}
+
+if(hdr.numskinfamilies && hdr.numskinref)
+{
+    FSeek(startof(hdr) + hdr.skinindex);
+    struct {
+        short texture[hdr.numskinref] <read=ReadString(startof(textures[this]) + textures[this].sznameindex)>;
+    } skingroup[hdr.numskinfamilies] <fgcolor=cDkGreen>;
+}
+
+// keyvalues
+if (hdr.keyvaluesize)
+{
+    FSeek(startof(hdr) + hdr.keyvalueindex);
+    char keyvalues[hdr.keyvaluesize] <fgcolor=cLtBlue>;
+}
+
+// bones 2
+#ifdef FEATURE_HDR2
+if (exists(hdr2.numsrcbonetransform) && hdr2.numsrcbonetransform)
+{
+    FSeek(startof(hdr2) + hdr2.srcbonetransformindex);
+    mstudiosrcbonetransform_t srcbonetransform[hdr2.numsrcbonetransform] <bgcolor=cDkGreen, read=ReadString(startof(this) + this.sznameindex)>;
+}
+#else
+if (exists(hdr.numsrcbonetransform) && hdr.numsrcbonetransform)
+{
+    FSeek(startof(hdr) + hdr.srcbonetransformindex);
+    mstudiosrcbonetransform_t srcbonetransform[hdr.numsrcbonetransform] <bgcolor=cDkGreen, read=ReadString(startof(this) + this.sznameindex)>;
+}
+#endif
+
+struct linearbonedata_t
+{
+    mstudiolinearbone_t linearbone <bgcolor=cGreen>;
+
+    FSeek(startof(linearbone) + linearbone.flagsindex);
+    int flags[linearbone.numbones] <fgcolor=cLtGreen>;
+
+    FSeek(startof(linearbone) + linearbone.parentindex);
+    int parents[linearbone.numbones] <bgcolor=cLtGreen>;
+
+    FSeek(startof(linearbone) + linearbone.posindex);
+    Vector positions[linearbone.numbones] <fgcolor=cLtGreen>;
+
+    FSeek(startof(linearbone) + linearbone.quatindex);
+    Quaternion quats[linearbone.numbones] <bgcolor=cLtGreen>;
+
+    FSeek(startof(linearbone) + linearbone.rotindex);
+    RadianEuler rotations[linearbone.numbones] <fgcolor=cLtGreen>;
+
+    FSeek(startof(linearbone) + linearbone.posetoboneindex);
+    matrix3x4_t poseToBones[linearbone.numbones] <bgcolor=cLtGreen>;
+
+    if (linearbone.posscaleindex)
+    {
+        FSeek(startof(linearbone) + linearbone.posscaleindex);
+        Vector posscales[linearbone.numbones] <fgcolor=cLtGreen>;
+    }
+    
+    FSeek(startof(linearbone) + linearbone.rotscaleindex);
+    Vector rotscales[linearbone.numbones] <bgcolor=cLtGreen>;
+
+    FSeek(startof(linearbone) + linearbone.qalignmentindex);
+    Quaternion qalignments[linearbone.numbones] <fgcolor=cLtGreen>;
+};
+
+#ifdef FEATURE_HDR2
+if (exists(hdr2.linearboneindex) && hdr2.linearboneindex)
+{
+    FSeek(startof(hdr2) + hdr2.linearboneindex);
+    linearbonedata_t linearbonedata;
+}
+#else
+if (exists(hdr.linearboneindex) && hdr.linearboneindex)
+{
+    FSeek(startof(hdr) + hdr.linearboneindex);
+    linearbonedata_t linearbonedata;
+}
+#endif
+
+// physics/collison
+struct pertrinode_t(int pNodeStart, int pLeafStart, int nodeIndex)
+{
+    FSeek(pNodeStart + (sizeof(mstudiopertrinode_t) * nodeIndex));
+    mstudiopertrinode_t node <fgcolor=0x6644dd>;
+    
+    local int childIdx = 0;
+    for (childIdx = 0; childIdx < 2; childIdx++)
+    {
+        if (node.childIndex[childIdx] < 0)
+        {
+            FSeek(pLeafStart + (~node.childIndex[childIdx] * sizeof(mstudiopertrileaf_t)));
+            mstudiopertrileaf_t leaf <fgcolor=0xffaaaa>;
+        }
+        else
+        {
+            BuildNodeTreeForBVH2(pNodeStart, pLeafStart, node.childIndex[childIdx]);
+        }
+    }
+};
+
+void BuildNodeTreeForBVH2(int pNodeStart, int pLeafStart, int nodeIndex)
+{
+    FSeek(pNodeStart);
+    pertrinode_t node_group(pNodeStart, pLeafStart, nodeIndex);
+}
+
+struct pertricollision_t(const int nodeCount, const int leafCount, const int vertCount) 
+{
+    local const int64_t pPerTriHeader = FTell();
+    mstudiopertrihdr_t hdr <fgcolor=cDkRed>; // header completely nulled out if unused.
+    
+    if ((nodeCount || nodeCount || vertCount) && hdr.version == 2)
+    {  
+        local int pNode = pPerTriHeader + sizeof(mstudiopertrihdr_t);
+        local int pLeaf = pNode + (sizeof(mstudiopertrinode_t) * nodeCount);
+    
+        if (nodeCount)
+        {
+            struct {
+                BuildNodeTreeForBVH2(pNode, pLeaf, 0);
+            } node_tree;
+        }
+    
+        FSeek(pNode);
+        mstudiopertrinode_t nodes[nodeCount];
+        mstudiopertrileaf_t leaves[leafCount];                         
+        mstudiopertrivertex_t verts[vertCount] <fgcolor=cRed>;
+    };
+};
+
+#ifdef FEATURE_HDR2
+if (exists(hdr2.m_nPerTriAABBIndex) && hdr2.m_nPerTriAABBIndex)
+{
+    FSeek(startof(hdr2) + hdr2.m_nPerTriAABBIndex);
+    pertricollision_t pertricollision(hdr2.m_nPerTriAABBNodeCount, hdr2.m_nPerTriAABBLeafCount, hdr2.m_nPerTriAABBVertCount);
+}
+#else
+if (exists(hdr.m_nPerTriAABBIndex) && hdr.m_nPerTriAABBIndex)
+{
+    FSeek(startof(hdr) + hdr.m_nPerTriAABBIndex);
+    pertricollision_t pertricollision(hdr.m_nPerTriAABBNodeCount, hdr.m_nPerTriAABBLeafCount, hdr.m_nPerTriAABBVertCount);
+}
+#endif
+
+// define structs and functions outside of the physfile struct
+#include "../phys/physfile_h.bt"
+
+if (exists(hdr.phySize) && hdr.phySize > 0)
+{
+    FSeek(startof(hdr) + hdr.phyOffset);
+    struct {
+        #include "../phys/phys_valve.bt"
+    } physfile;
+}
+
+// map collision
+#ifdef FEATURE_MAPCOLL
+struct mapcollsection_t(const int parentIdx)
+{
+    local int parent = parentIdx;
+
+    mstudiocollhdr_t collhdr <bgcolor=cBlue>;
+
+    FSeek(startof(collhdr) + collhdr.dataOffset);
+    mstudiocollface_t face[collhdr.faceAndUnkCount] <bgcolor=cLtBlue>;             
+    mstudiocolledge_t edge[collhdr.edgeCount] <bgcolor=cDkBlue>;            
+    Vector vertex[collhdr.vertCount] <bgcolor=cBlue>; // vertices
+};
+
+void GenerateCollSections(const int sectionIdx, const int sectionCount, const int64_t baseptr, const int boneIdx)
+{
+    local int localSectionIdx;
+    for(localSectionIdx = 0; localSectionIdx < sectionCount; localSectionIdx++)
+    {
+        FSeek(baseptr + (sizeof(mstudiocollhdr_t) * (sectionIdx + localSectionIdx)));
+        mapcollsection_t section(boneIdx) <read=Str("parent: %s", ReadString(startof(bones[this.parent]) + bones[this.parent].sznameindex))>;
+    }
+}
+
+// used for collision on maps, "based of planes like brushes, but also uses edges for ray collision"
+if (hdr.phySize > 0)
+{
+    Assert(exists(hdr.staticCollisionCount));
+    Assert(exists(hdr.collisionOffset));
+
+    local const int64_t collBaseptr = startof(hdr) + hdr.collisionOffset;
+
+    struct {
+        if(hdr.staticCollisionCount)
+            GenerateCollSections(0, hdr.staticCollisionCount, collBaseptr, 0);
+        else
+        {
+            // we have to do a loop here for some edge case models with weird phys, and by weird I mean
+            // more than one section while also having more than one tri header per section
+            // examples found to date like this:
+            // models\s2s\s2s_malta_gun_animated.mdl
+            for(i = 0; i < hdr.numbones; i++)
+            {
+                if(!bones[i].collisionCount)
+                    continue;
+            
+                GenerateCollSections(bones[i].collisionIndex, bones[i].collisionCount, collBaseptr, i);
+            }
+        }
+    } collision_map;
+}
+#endif
+
+if(exists(hdr.boneFollowerCount) && hdr.boneFollowerCount)
+{
+    FSeek(startof(hdr) + hdr.boneFollowerOffset);
+    int bone_follower[hdr.boneFollowerCount] <fgcolor=cLtYellow, read=ReadString(startof(bones[this]) + bones[this].sznameindex)>;
+}
+
+// vertex files
+if (exists(hdr.vtxSize) && hdr.vtxSize > 0)
+{
+    FSeek(startof(hdr) + hdr.vtxOffset);
+    struct {
+        #include "../vertex/vtx.bt"
+    } vtx;
+}
+
+if (exists(hdr.vvdSize) && hdr.vvdSize > 0)
+{
+    FSeek(startof(hdr) + hdr.vvdOffset);
+    struct {
+        #include "../vertex/vvd.bt"
+    } vvd;
+}
+
+if (exists(hdr.vvcSize) && hdr.vvcSize > 0)
+{
+    FSeek(startof(hdr) + hdr.vvcOffset);
+    struct {
+        #include "../vertex/vvc.bt"
+    } vvc;
+}
