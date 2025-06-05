@@ -1,0 +1,140 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: pakfile_aseq.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Pak Files
+//  Category: Archive
+// File Mask: *.rpak
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+const uint32_t ID_ASEQ = 0x71657361;
+
+struct AnimSeqAssetHeader_v7_t
+{
+	PagePtr_t data;
+	PagePtr_t name;
+
+	PagePtr_t models; // guids, uint64_t*?
+	uint64_t numModels;
+
+	PagePtr_t settings; // guids, uint64_t*?
+	uint64_t numSettings;
+};
+
+// seasons 7 to 8
+struct AnimSeqAssetHeader_v7_1_t
+{
+	PagePtr_t data;
+	PagePtr_t name;
+
+	PagePtr_t models; // guids, uint64_t*?
+	uint32_t numModels;
+	uint32_t dataExtraSize; // size of extra data
+
+	PagePtr_t settings; // guids, uint64_t*?
+	uint64_t numSettings;
+
+	PagePtr_t dataExtra; // external data, sometimes streamed
+};
+
+// season 8.1 (v8) (R5pc_r5-81_J94_CL862269_2021_03_01_16_25)
+// seasons 9 to 14 (v10)
+// seasons 15 to
+struct AnimSeqAssetHeader_v8_t
+{
+	PagePtr_t data;
+	PagePtr_t name;
+
+	uint64_t unk_10;
+
+	uint16_t numModels;
+	uint16_t numSettings;
+
+	uint32_t dataExtraSize; // size of extra data
+
+	PagePtr_t models; // guids, uint64_t*?
+	PagePtr_t effects; // guids, uint64_t*?
+	PagePtr_t settings; // guids, uint64_t*?
+
+	PagePtr_t dataExtra; // external data, sometimes streamed
+};
+
+void HandleAnimSeq(PakAsset_t& asset, uint64_t pageoffsets[])
+{
+    local int studioDataSize = 0;
+
+    PageSeek(asset.headPagePtr);
+    switch (asset.version)
+    {
+    case 7:
+    {
+        studioDataSize = 208;
+
+        if (asset.headerStructSize == 56)
+        {
+            AnimSeqAssetHeader_v7_1_t hdr;
+            break;
+        }
+
+        AnimSeqAssetHeader_v7_t hdr;
+        break;
+    };
+    case 8:
+    case 10:
+    {
+        AnimSeqAssetHeader_v8_t hdr;
+        studioDataSize = 208;
+        break;
+    };
+    case 11:
+    {
+        AnimSeqAssetHeader_v8_t hdr;
+        studioDataSize = 112;
+        break;
+    };
+    case 12:
+    {
+        AnimSeqAssetHeader_v8_t hdr;
+        studioDataSize = 116;
+        break;
+    };
+    };
+
+    
+    PageSeek(hdr.name);
+    string name;
+
+    // studio sequence
+    PageSeek(hdr.data);
+    char studioData[studioDataSize];
+
+    if (exists(hdr.dataExtra) && PtrIsValid(hdr.dataExtra))
+    {
+        PageSeek(hdr.dataExtra);
+        char studioDataExtra[hdr.dataExtraSize];
+    }
+
+    // linked assets
+    if (hdr.numModels)
+    {
+        PageSeek(hdr.models);
+        uint64_t models[hdr.numModels];
+    }
+
+    if (exists(hdr.effects) && PtrIsValid(hdr.effects))
+    {
+        // you'd have to cycle through the sequences to get the count for this
+        PageSeek(hdr.effects);
+        uint64_t effects[1];
+    }
+
+    if (hdr.numSettings)
+    {
+        PageSeek(hdr.settings);
+        uint64_t settings[hdr.numSettings];
+    }
+}

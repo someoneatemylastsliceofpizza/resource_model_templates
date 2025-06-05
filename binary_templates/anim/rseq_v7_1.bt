@@ -226,11 +226,6 @@ struct mstudioanimsections_t
     char pad[3] <hidden=true>;
 };
 
-int GetRMDLOffset(int offset)
-{
-    return offset;
-}
-
 #define USE_BIG_NUMBERS
 #define FEATURE_STALL
 

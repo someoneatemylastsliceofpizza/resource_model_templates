@@ -216,11 +216,6 @@ struct mstudioanimsections_t
 	int animindex;
 };
 
-int GetRMDLOffset(int offset)
-{
-    return offset;
-}
-
 #define USE_BIG_NUMBERS
 
 #include "./rseq.bt"

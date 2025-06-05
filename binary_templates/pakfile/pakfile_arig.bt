@@ -1,0 +1,236 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: pakfile_arig.bt
+//   Authors: Rika
+//   Version: 0.1
+//   Purpose: Respawn Pak Files
+//  Category: Archive
+// File Mask: *.rpak
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+const uint32_t ID_ARIG = 0x67697261;
+
+// eeewww
+#ifndef STUDIO_16
+#define STUDIO_16
+struct studiohdr_v16_t
+{
+	int flags;
+	int checksum; // unsure if this is still checksum, there isn't any other files that have it still
+	uint16_t sznameindex; // No longer stored in string block, uses string in header.
+	char name[32]; // The internal name of the model, padding with null chars.
+	char unk_0x2A; // always zero
+
+	uint8_t surfacepropLookup; // saved in the file
+
+	float mass;
+
+	int unk_0x30; // this is not version
+
+	uint16_t hitboxsetindex;
+	uint8_t numhitboxsets;
+
+	uint8_t illumpositionattachmentindex;
+
+	Vector illumposition;	// illumination center
+
+	Vector hull_min;		// ideal movement hull size
+	Vector hull_max;
+
+	Vector view_bbmin;		// clipping bounding box
+	Vector view_bbmax;
+
+	uint16_t boneCount; // bones
+	uint16_t boneHdrOffset;
+	uint16_t boneDataOffset;
+
+	uint16_t numlocalseq; // sequences
+	uint16_t localseqindex;
+
+	// needs to be confirmed
+	uint16_t unk_v54_v14[2]; // added in v13 -> v14
+
+	// needs to be confirmed
+	char activitylistversion; // initialization flag - have the sequences been indexed?
+
+	uint8_t numlocalattachments;
+	uint16_t localattachmentindex;
+
+	uint16_t numlocalnodes;
+	uint16_t localnodenameindex;
+	uint16_t localNodeDataOffset; // offset into an array of int sized offsets that read into the data for each node
+
+	uint16_t numikchains;
+	uint16_t ikchainindex;
+
+	uint16_t numtextures; // the material limit exceeds 128, probably 256.
+	uint16_t textureindex;
+
+	// replaceable textures tables
+	uint16_t numskinref;
+	uint16_t numskinfamilies;
+	uint16_t skinindex;
+
+	uint16_t numbodyparts;
+	uint16_t bodypartindex;
+
+	// this is rui meshes
+	uint16_t uiPanelCount;
+	uint16_t uiPanelOffset;
+
+	uint16_t numlocalposeparameters;
+	uint16_t localposeparamindex;
+
+	uint16_t surfacepropindex;
+
+	uint16_t keyvalueindex;
+
+	// hw data lookup from rmdl
+	uint16_t meshCount; // number of meshes per lod
+	uint16_t meshOffset;
+
+	uint16_t bonetablebynameindex;
+
+	uint16_t boneStateOffset;
+	uint16_t boneStateCount;
+
+	// sets of lods
+	uint16_t groupHeaderOffset;
+	uint16_t groupHeaderCount;
+
+	uint16_t lodOffset;
+	uint16_t lodCount;  // check this
+
+	// 
+	float fadeDistance;
+	float gathersize; // what. from r5r struct
+
+	uint16_t numsrcbonetransform;
+	uint16_t srcbonetransformindex;
+
+	// asset bakery strings if it has any
+	uint16_t sourceFilenameOffset;
+
+	uint16_t linearboneindex;
+
+	// unsure what this is for but it exists for jigglbones
+	uint16_t procBoneCount;
+	uint16_t procBoneOffset;
+	uint16_t linearProcBoneOffset;
+
+	// mostly seen on '_animated' suffixed models
+	// manually declared bone followers are no longer stored in kvs under 'bone_followers', they are now stored in an array of ints with the bone index.
+	uint16_t boneFollowerCount;
+	uint16_t boneFollowerOffset;
+
+	uint16_t bvhOffset;
+
+	char bvhUnk[2]; // collision detail for bvh (?)
+
+	short unk_0xDA;
+	short unk_0xDC;
+	short unk_0xDE;
+};
+
+struct mstudiobonedata_v16_t
+{
+	matrix3x4_t poseToBone;
+	Quaternion qAlignment;
+
+	// default values
+	Vector pos;
+	Quaternion quat;
+	RadianEuler rot;
+	Vector scale; // bone scale(?)
+
+	short parent; // parent bone;
+
+	uint16_t unk_0x76; // gotta be used because there's to 8 bit vars that could've fit here, still may be packing. previously 'unk1'
+
+	int flags;
+
+	uint8_t collisionIndex; // index into sections of collision, phy, bvh, etc. needs confirming
+
+	uint8_t proctype;
+	uint16_t procindex; // procedural rule
+};
+#endif
+
+struct AnimRigAssetHeader_v4_t
+{
+	PagePtr_t data; // ptr to studiohdr & rrig buffer
+
+	PagePtr_t name;
+
+	int unk_10;
+
+	int numAnimSeqs;
+	PagePtr_t animSeqs;
+
+	int64_t unk_20; // probably reserved
+};
+
+struct AnimRigAssetHeader_v5_t
+{
+	PagePtr_t data; // ptr to studiohdr & rrig buffer
+
+	PagePtr_t name;
+
+	short unk_10;
+
+	short numAnimSeqs;
+
+	int unk_14; // 
+
+	PagePtr_t animSeqs;
+
+	int64_t unk_20; // probably reserved
+};
+
+void HandleAnimRig(PakAsset_t& asset, uint64_t pageoffsets[])
+{
+    PageSeek(asset.headPagePtr);
+    switch (asset.version)
+    {
+    case 4:
+    {
+        AnimRigAssetHeader_v4_t hdr;
+        break;
+    };
+    case 5:
+    case 6:
+    {
+        AnimRigAssetHeader_v5_t hdr;
+        break;
+    };
+    };
+
+    local int studioDataSize = 4;
+    if (asset.version == 4)
+    {
+        studioDataSize = ReadInt(PageTell(hdr.data) + 80);
+    }
+    else
+    {
+        PageSeek(hdr.data);
+        studiohdr_v16_t tmp <hidden=true>;
+        studioDataSize = FIX_OFFSET(tmp.boneDataOffset) + (tmp.boneCount * sizeof(mstudiobonedata_v16_t));
+    }
+
+    // studio model
+    PageSeek(hdr.data);
+    char studioData[studioDataSize];
+
+    PageSeek(hdr.name);
+    string name;
+
+    // linked assets
+    if (hdr.numAnimSeqs)
+    {
+        PageSeek(hdr.animSeqs);
+        uint64_t animSeqs[hdr.numAnimSeqs];
+    }
+}

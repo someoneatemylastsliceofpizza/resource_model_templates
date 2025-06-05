@@ -179,13 +179,19 @@ struct {
     }
 } page_data;
 
+// asset deps
+#include "../model/studio_r5_h.bt"
+
 // asset data
 #include "./pakfile_txtr.bt"
 #include "./pakfile_matl.bt"
 #include "./pakfile_msnp.bt"
 #include "./pakfile_mdl_.bt"
+#include "./pakfile_arig.bt"
+#include "./pakfile_aseq.bt"
 #include "./pakfile_rpsk.bt"
 #include "./pakfile_font.bt"
+#include "./pakfile_uimg.bt"
 
 FSeek(startof(page_data));
 struct
@@ -231,6 +237,24 @@ struct
 
             break;
         }
+        case ID_ARIG:
+        {
+            struct {
+                local int index = i;
+                HandleAnimRig(assets[index], pageoffsets);
+            } asset_arig <read=GetAssetName(assets[index], this.hdr.name)>;
+
+            break;
+        }
+        case ID_ASEQ:
+        {
+            struct {
+                local int index = i;
+                HandleAnimSeq(assets[index], pageoffsets);
+            } asset_aseq <read=GetAssetName(assets[index], this.hdr.name)>;
+
+            break;
+        }
         case ID_RPSK:
         {
             struct {
@@ -246,6 +270,15 @@ struct
                 local int index = i;
                 HandleUIFontAtlas(assets[index], pageoffsets);
             } asset_font <read=DefaultAssetName(assets[index])>;
+
+            break;
+        }
+        case ID_UIMG:
+        {
+            struct {
+                local int index = i;
+                HandleUIImageAtlas(assets[index], pageoffsets);
+            } asset_uimg <read=DefaultAssetName(assets[index])>;
 
             break;
         }
@@ -267,18 +300,20 @@ struct
 if (pakhdr.numGuidRefs)
 {
     FSeek(startof(guidRefs));
-    PakGuidRefHdr_t internalGuidRefs[pakhdr.numGuidRefs] <hidden = true>;
+    PakGuidRefHdr_t internalGuidRefs[pakhdr.numGuidRefs] <hidden=true>;
 
     for(i = 0; i < pakhdr.numGuidRefs; i++)
     {
         PageSeek(internalGuidRefs[i]);
-        uint64_t guid <hidden = true, fgcolor = cYellow>;
+        uint64_t guid <hidden=true, fgcolor=cYellow>;
     }
 }
 
 // color pointers
-for (i = 0; i < pakhdr.numPointers; i++)
+local const int64_t numPointersClamped = pakhdr.numPointers > 0xFFFF ? 0xFFFF : pakhdr.numPointers;
+
+for (i = 0; i < numPointersClamped; i++)
 {
     PageSeek(pointers[i]);
-    PagePtr_t ptr_color <hidden=true, fgcolor=0xCCCC00>;
+    PagePtr_t ptr <hidden=true, fgcolor=0xCCCC00, optimize=true>;
 }

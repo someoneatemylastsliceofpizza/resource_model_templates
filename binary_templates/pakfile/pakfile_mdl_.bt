@@ -20,6 +20,118 @@ struct ModelAssetCPU_t
 	int dataSizeModel;
 };
 
+struct ModelAssetHeader_v8_t
+{
+	PagePtr_t data; // ptr to studiohdr & rmdl buffer
+
+	PagePtr_t name;
+
+	char unk_10[8];
+
+	PagePtr_t physics;
+
+	PagePtr_t permVertData; // permanent vertex components
+
+	PagePtr_t animRigs;
+	int numAnimRigs;
+
+	int componentDataSize; // size of individual mdl components pre-baking (vtx, vvd, etc.)
+	int streamingDataSize; // size of VG data post-baking. probably not real but we don't need to change packing
+
+	int numAnimSeqs;
+	PagePtr_t animSeqs;
+
+	char unk_48[8];
+};
+
+struct ModelAssetHeader_v9_t
+{
+	PagePtr_t data; // ptr to studiohdr & rmdl buffer
+	PagePtr_t reserved_1;
+
+	PagePtr_t name;
+	char gap_18[8];
+
+	PagePtr_t physics;
+	PagePtr_t unk_28;
+
+	PagePtr_t permVertData; // used for static prop cache
+
+	PagePtr_t animRigs;
+	int numAnimRigs;
+
+	int componentDataSize; // size of individual mdl components pre-baking (vtx, vvd, etc.)
+	int streamingDataSize; // size of VG data post-baking
+
+	uint64_t unk_4C;
+	uint64_t unk_54;
+	uint32_t unk_5C;
+
+	int numAnimSeqs;
+	PagePtr_t animSeqs;
+
+	char gap_6C[8];
+};
+
+struct ModelAssetHeader_v12_1_t
+{
+	PagePtr_t data; // ptr to studiohdr & rmdl buffer
+	PagePtr_t reserved_1;
+
+	PagePtr_t name;
+	char gap_18[8];
+
+	PagePtr_t physics;
+	PagePtr_t unk_28;
+
+	PagePtr_t permVertData; // used for static prop cache
+
+	PagePtr_t animRigs;
+	int numAnimRigs;
+
+	int componentDataSize; // size of individual mdl components pre-baking (vtx, vvd, etc.)
+	int streamingDataSize; // size of VG data post-baking
+
+	char gap_4C[8];
+
+	// number of anim sequences directly associated with this model
+	int numAnimSeqs;
+	PagePtr_t animSeqs;
+
+	char gap_60[8];
+};
+
+struct ModelAssetHeader_v13_t
+{
+	PagePtr_t data; // ptr to studiohdr & rmdl buffer
+	PagePtr_t reserved_1;
+
+	PagePtr_t name;
+	char gap_18[8];
+
+	PagePtr_t physics;
+	PagePtr_t unk_28;
+
+	PagePtr_t permVertData; // used for static prop cache
+
+	PagePtr_t animRigs;
+	int numAnimRigs;
+
+	int componentDataSize; // size of individual mdl components pre-baking (vtx, vvd, etc.)
+	int streamingDataSize; // size of VG data post-baking
+
+	Vector bbox_min;
+	Vector bbox_max;
+
+	char gap_64[8];
+
+	// number of anim sequences directly associated with this model
+	int numAnimSeqs;
+	PagePtr_t animSeqs;
+
+	char gap_78[8];
+};
+
 struct ModelAssetHeader_v16_t
 {
 	PagePtr_t data; // ptr to studiohdr & rmdl buffer
@@ -52,6 +164,37 @@ void HandleModel(PakAsset_t& asset, uint64_t pageoffsets[])
     PageSeek(asset.headPagePtr);
     switch (asset.version)
     {
+    case 8:
+    {
+        ModelAssetHeader_v8_t hdr;
+        break;
+    };
+    case 9:
+    case 10:
+    case 11:
+    {
+        ModelAssetHeader_v9_t hdr;
+        break;
+    };
+    case 12:
+    {
+        if (asset.headerStructSize == 120)
+        {
+            ModelAssetHeader_v9_t hdr;
+            break;
+        }
+
+        ModelAssetHeader_v12_1_t hdr;
+        break;
+        
+    };
+    case 13:
+    case 14:
+    case 15:
+    {
+        ModelAssetHeader_v13_t hdr;
+        break;        
+    };
     case 16:
     case 17:
     case 18:
@@ -70,20 +213,43 @@ void HandleModel(PakAsset_t& asset, uint64_t pageoffsets[])
     local int studioDataSize = 4;
     if (asset.version < 16)
     {
-        // read length var here
+        studioDataSize = ReadInt(PageTell(hdr.data) + 80);
     }
 
-    if (exists(cpu))
+    if (asset.version >= 16 && exists(cpu))
     {
         studioDataSize = cpu.dataSizeModel;
     }
 
+    // studio model
     PageSeek(hdr.data);
     char studioData[studioDataSize];
+
+    // vertex
+    if (PtrIsValid(hdr.permVertData))
+    {
+        PageSeek(hdr.permVertData);
+        local const int vertDataSize = asset.version == 8 ? hdr.componentDataSize : hdr.streamingDataSize;
+        char vertexData[vertDataSize];
+    }
+
+    // phys
+    if (exists(hdr.physics) && PtrIsValid(hdr.physics))
+    {
+        PageSeek(hdr.physics);
+        char physicsData[16];
+    }
+
+    if (exists(cpu) && PtrIsValid(cpu.physics))
+    {
+        PageSeek(cpu.physics);
+        char physicsData[cpu.dataSizePhys];
+    }
 
     PageSeek(hdr.name);
     string name;
 
+    // linked assets
     if (hdr.numAnimRigs)
     {
         PageSeek(hdr.animRigs);

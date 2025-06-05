@@ -218,13 +218,6 @@ struct mstudioanimsections_t
 	int animindex;
 };
 
-int GetRMDLOffset(unsigned short offset)
-{
-    local int fixedOffset = ((offset & 0xFFFE) << (4 * (offset & 1)));
-
-    return fixedOffset;
-}
-
 #define FEATURE_STALL
 #define FEATURE_NOINTERPFRAMES
 #define FEATURE_STATICSTRUCTS
