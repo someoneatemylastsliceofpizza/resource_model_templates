@@ -1,0 +1,251 @@
+//------------------------------------------------
+//--- 010 Editor v15.0.2 Binary Template
+//
+//      File: vg
+//   Authors: 
+//   Version: 1
+// Increment: 
+//   Purpose: Template
+//  Category: Model
+// File Mask: *.vg
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+#include "../source_math.bt"
+
+local int i = 0;
+local int j = 0;
+local int k = 0;
+
+//got the structs from rmdlconv
+struct mstudiopackedweights_t
+{
+	unsigned short weight[2];	// packed weight with a max value of 32767, divide value by 32767 to get weight. weights will always correspond to first and second bone
+	// if the mesh has extra bone weights the second value will be used as an index into the array of extra bone weights, max value of 65535.
+};
+
+struct mstudiopackedbones_t
+{
+	unsigned char bones[3];	// when the model doesn't have extra bone weights all three are used for bone indices, otherwise in order they will be used for: first bone, last bone (assumes vvd->vg), unused.
+	byte numbones;	// number of bones this vertex is weighted to excluding the base weight (value of 0 if only one weight, max of 15 with 16 weights)
+};
+
+string getMeshFlagsString(int flags){
+    local string result = "";
+    
+    if(flags & 0x1) result += "POSITION | ";
+    if(flags & 0x2) result += "POSITION_PACKED | ";
+    if(flags & 0x10) result += "COLOR | ";
+    if(flags & 0x40) result += "UNK_0x40 | ";
+    if(flags & 0x200) result += "NORMAL_PACKED | ";
+    if(flags & 0x800) result += "UNK_0x800 | ";
+    if(flags & 0x1000) result += "WEIGHT_BONES | ";
+    if(flags & 0x2000) result += "WEIGHT_VALUES_N | ";
+    if(flags & 0x4000) result += "WEIGHT_VALUES_2 | ";
+    if(flags & 0x2000000) result += "UV1 | ";
+    if(flags & 0x200000000) result += "UV2 | ";
+    
+    if(flags == 0) result = "NO MESH FLAGS";
+    return result;
+}
+    
+struct VG_MeshHeader_t
+{
+	__int64 flags <read=getMeshFlagsString(this)>;	// mesh flags
+
+	// uses dynamic sized struct, similar to RLE animations
+	unsigned int vertOffset;			    // start offset for this mesh's vertices
+	unsigned int vertCacheSize;		    // size of the vertex structure
+	unsigned int vertCount;			    // number of vertices
+
+	int unk1;
+
+	// vvw::mstudioboneweightextra_t
+	int extraBoneWeightOffset;	// start offset for this mesh's "extended weights"
+	int extraBoneWeightSize;    // size or count of extended weights
+
+	// unsigned short
+	int indicesOffset;			// start offset for this mesh's "indices"
+	int indicesCount;				// number of indices
+
+	// vvd::mstudioboneweight_t
+	int legacyWeightOffset;	// seems to be an offset into the "external weights" buffer for this mesh
+	int legacyWeightCount;   // seems to be the number of "external weights" that this mesh uses
+
+	// vtx::StripHeader_t
+	int stripOffset;        // Index into the strips structs
+	int stripCount;
+
+	// might be stuff like topologies and or bonestates, definitely unused
+	int unk[4];
+
+	/*int numBoneStateChanges;
+	int boneStateChangeOffset;
+	// MDL Version 49 and up only
+	int numTopologyIndices;
+	int topologyOffset;*/
+};
+
+struct LodHdr_t{
+    ushort meshOffset;
+    ushort meshCount;
+    float switchPoint;
+};
+
+struct UnkVgData_t
+{
+	/*int unk1;
+	int unk2;
+	float unk3;
+	int unk4;
+	int unk5;
+	short unk6;
+	short unk7;
+	short unk8;
+	short unk9;
+	int unk10;
+	int unk11;
+	short unk12;
+	short unk13;
+	short unk14;
+	short unk15;
+	int pad;*/
+    int unk[12];
+};
+        
+struct VertexGroupHeader_t{
+    char magic[4];
+    int version;
+    int checksum;
+    int length;  
+    __int64 boneStateChangeOffset; // offset to bone remap buffer
+    __int64 boneStateChangeCount;  // number of "bone remaps" (size: 1)
+    
+    // MeshHeader_t
+    __int64 meshOffset;   // offset to mesh buffer
+    __int64 meshCount;    // number of meshes (size: 0x48)
+    
+    // unsigned short
+    __int64 indicesOffset;     // offset to index buffer
+    __int64 indicesCount;      // number of indices (size: 2 (uint16_t))
+    
+    // uses dynamic sized struct, similar to RLE animations
+    __int64 vertOffset;    // offset to vertex buffer
+    __int64 vertBufferSize;     // number of chars in vertex buffer
+    
+    // vvw::mstudioboneweightextra_t
+    __int64 extraBoneWeightOffset;   // offset to extended weights buffer
+    __int64 extraBoneWeightSize;    // number of chars in extended weights buffer
+    
+    // there is one for every LOD mesh
+    // i.e, unknownCount == lod.meshCount for all LODs
+    __int64 unknownOffset;   // offset to buffer
+    __int64 unknownCount;    // count (size: 0x30)
+    
+    // ModelLODHeader_t
+    __int64 lodOffset;       // offset to LOD buffer
+    __int64 lodCount;        // number of LODs (size: 0x8)
+    
+    // vvd::mstudioboneweight_t
+    __int64 legacyWeightOffset;	// seems to be an offset into the "external weights" buffer for this mesh
+    __int64 legacyWeightCount;   // seems to be the number of "external weights" that this mesh uses
+    
+    // vtx::StripHeader_t
+    __int64 stripOffset;    // offset to strips buffer
+    __int64 stripCount;     // number of strips (size: 0x23)
+    
+    __int64 unused[8];  
+};
+
+enum <ubyte> StripHeaderFlags_t
+{
+	STRIP_IS_TRILIST		= 0x01,
+	STRIP_IS_QUADLIST_REG	= 0x02,		// Regular sub-d quads
+	STRIP_IS_QUADLIST_EXTRA = 0x04		// Extraordinary sub-d quads
+};
+
+struct StripHdr_t
+{
+	int indicesCount;
+	int indicesOffset;
+
+	int vertCount;    
+	int vertOffset;
+
+	short numBones;
+
+	StripHeaderFlags_t flags;
+
+	int numBoneStateChanges;
+	int boneStateChangeOffset;
+
+	// MDL Version 49 and up only
+	int numTopologyIndices;
+	int topologyOffset;
+};
+
+struct PackedNormalTangent_32 {
+    uint angle      :10 <read=Str("%f deg", this * (360.0 / 1024.0))>; //(360.0 / 1024.0) deg, 0.00614192151 rad
+    uint n1         :9  <read=Str("%f", this - 256)>;
+    uint n2         :9  <read=Str("%f", this - 256)>;
+    uint drop_sign  :1  <read=Str("%s", this ? "Negative" : "Positive")>;
+    uint drop       :2  <read=Str("%s", this == 0 ? "X" : this == 1 ? "Y" : "Z")>;
+    uint Tangent_w  :1  <read=Str("%s", this ? "< 1" : ">= 1")>;
+};
+
+//local float bbmax_x = -3.402823466e+38F;
+
+VertexGroupHeader_t hdr <bgcolor=0x552244>;
+for(i = 0; i < hdr.meshCount; i++){
+    FSeek(hdr.meshOffset + i * sizeof(VG_MeshHeader_t));
+    struct{
+        VG_MeshHeader_t meshHdr <bgcolor=0x99CC44>;
+        
+        for(j = 0; j < meshHdr.stripCount; j++){
+            FSeek(hdr.stripOffset + (meshHdr.stripOffset + j) * sizeof(StripHdr_t));
+            StripHdr_t strip <bgcolor=cLtPurple>;
+            
+            FSeek(hdr.indicesOffset + meshHdr.indicesOffset * 2 + strip.indicesOffset * 2);
+            struct{
+                for(k = 0; k < strip.indicesCount/2; k++){
+                    struct{
+                        short start;
+                        short end;
+                    } indice <read=Str("%d -> %d", this.start, this.end)>; //[meshHdr.indicesCount/2]
+                }
+            }indices<bgcolor=0x882444>;
+            
+            FSeek(hdr.vertOffset + meshHdr.vertOffset + strip.vertOffset);
+            struct{
+                for(k = 0; k < strip.vertCount; k++){
+                    struct{
+                        if(meshHdr.flags & 0x1) Vector m_vecPosition;
+		                if(meshHdr.flags & 0x2) Vector64 m_vecPositionPacked;
+		                if(meshHdr.flags & 0x4000) mstudiopackedweights_t m_WeightsPacked;
+		                if(meshHdr.flags & 0x1000) mstudiopackedbones_t m_BonesPacked;
+		                if(meshHdr.flags & 0x200) PackedNormalTangent_32 m_NormalTangentPacked;
+		                if(meshHdr.flags & 0x10) VertexColor_t m_color;
+		                if(meshHdr.flags & 0x2000000) Vector2D m_vecTexCoord;
+		                if(meshHdr.flags & 0x200000000) Vector2D m_vecTexCoord2;
+                    
+                        //bbmax_x = Max(bbmax_x, (this.m_vecPositionPacked.z - 2097152.) * (1024. / 1048576.5));
+                    }vert ; //[meshHdr.vertCount]
+                }
+            }vertices <bgcolor=0x244488>;
+        }
+    }mesh;
+}
+//Printf("max_x:%f\n",bbmax_x);
+
+FSeek(hdr.extraBoneWeightSize);
+//
+
+FSeek(hdr.unknownOffset);
+UnkVgData_t unkVgData[hdr.unknownCount] <bgcolor=0x248844>;
+
+FSeek(hdr.lodOffset);
+LodHdr_t lodHdr[hdr.lodCount] <bgcolor=0xAA8824>;
+
+FSeek(hdr.legacyWeightOffset);
+//

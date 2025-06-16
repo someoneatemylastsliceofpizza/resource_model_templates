@@ -7,7 +7,7 @@ Located int the 'binary_templates' folder.
 Studio Model:
   - rseq (7, 7.1, 10, 11, 12)
   - phys (valve and respawn)
-  - vertex (vtx, vvd, vvc, and vvw)
+  - vertex (vtx, vvd, vvc, vvw and vg)
   - mdl (52, 53, and 63)
 
 Misc:

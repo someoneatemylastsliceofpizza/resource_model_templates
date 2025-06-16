@@ -78,6 +78,13 @@ struct Vector48
     hfloat z;
 };
 
+struct Vector64
+{
+	__int64 x : 21 <read=Str("%f", (this - 1048576) * (1024. / 1048576.5))>;
+	__int64 y : 21 <read=Str("%f", (this - 1048576) * (1024. / 1048576.5))>;
+	__int64 z : 22 <read=Str("%f", (this - 2097152) * (1024. / 1048576.5))>;
+};
+
 // quaternion
 struct Quaternion
 {
@@ -148,8 +155,5 @@ struct VertexColor_t
 {
 	uint8 r, g, b, a;
 };
-
-// silly guy
-local int64_t i = 0;
 
 #endif
