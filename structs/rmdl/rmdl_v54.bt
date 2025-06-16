@@ -144,15 +144,54 @@ if(hdr.bvh4index > 0)
     FSeek(hdr.bvh4index);
     mstudiocollmodel_t collmodel <bgcolor=cDkBlue>;
 
+    local int vert_count = 0;
+    local int vert_idx = 0;
+    local float vert_shift_x = 0.;
+    local float vert_shift_y = 0.;
+    local float vert_shift_z = 0.;
+    local float vert_scale = 1.0;
+    
+    //local Vector bbmin;
+    //local Vector bbmax;
+    
     for(i = 0; i < collmodel.headerCount; ++i)
     {
+        //bbmin.x = 33333.;
+        //bbmin.y = 33333.;
+        //bbmin.z = 33333.;
+        //bbmax.x = -33333.;
+        //bbmax.y = -33333.;
+        //bbmax.z = -33333.;
         FSeek(startof(collmodel) + sizeof(collmodel) + (i * sizeof(mstudiocollheader_t)));
         struct {
             mstudiocollheader_t collheader <bgcolor=cPurple>;
+            
+            vert_shift_x = collheader.vert_shift.x;
+            vert_shift_y = collheader.vert_shift.y;
+            vert_shift_z = collheader.vert_shift.z;
+            vert_scale = collheader.vert_scale * 65536.;
 
             FSeek(startof(collmodel) + collheader.vertIndex);
-            char vertexData[collheader.bvhLeafIndex - collheader.vertIndex] <fgcolor=0xb083c7>;
-
+            vert_count = (collheader.bvhLeafIndex - collheader.vertIndex) / 2 / 3;
+            for(vert_idx = 0; vert_idx < vert_count; vert_idx++){
+                struct {
+                    short x <read=Str("%.6f", this*vert_scale+vert_shift_x)>;
+                    short y <read=Str("%.6f", this*vert_scale+vert_shift_y)>;
+                    short z <read=Str("%.6f", this*vert_scale+vert_shift_z)>;
+                    
+                    //bbmin.x = Min(bbmin.x, x*vert_scale+vert_shift_x);
+                    //bbmin.y = Min(bbmin.y, y*vert_scale+vert_shift_y);
+                    //bbmin.z = Min(bbmin.z, z*vert_scale+vert_shift_z);
+                    
+                    //bbmax.x = Max(bbmax.x, x*vert_scale+vert_shift_x);
+                    //bbmax.y = Max(bbmax.y, y*vert_scale+vert_shift_y);
+                    //bbmax.z = Max(bbmax.z, z*vert_scale+vert_shift_z);
+                } vert <fgcolor=0xb083c7>;
+            }
+            
+            //Printf("bbmin x:%f, y:%f, z:%f\n", bbmin.x,bbmin.y,bbmin.z);
+            //Printf("bbmax x:%f, y:%f, z:%f\n", bbmax.x,bbmax.y,bbmax.z);
+            
             FSeek(startof(collmodel) + collheader.bvhNodeIndex);
             CreateBVHNodes(startof(collmodel) + collheader.bvhNodeIndex, startof(collmodel) + collheader.bvhLeafIndex, 0);
         } collHeaderData;

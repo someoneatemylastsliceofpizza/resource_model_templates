@@ -2369,8 +2369,8 @@ struct mstudiocollheader_t
     int bvhNodeIndex;
     int vertIndex;
     int bvhLeafIndex;
-    float unk_10[3];
-    char unk_1C[4];
+    Vector vert_shift; //the data is stored like linear function  //vert_scale * value + vert_shift (mx+b)
+    float vert_scale <read=Str("1 / %f", 1 / this / 65536.)>; // * 65536
 };
 
 struct mstudiocollheader_t_v12
