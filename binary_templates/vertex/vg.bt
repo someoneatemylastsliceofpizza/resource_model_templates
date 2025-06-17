@@ -88,30 +88,32 @@ struct VG_MeshHeader_t
 };
 
 struct LodHdr_t{
-    ushort meshOffset;
-    ushort meshCount;
+    ushort unkOffset;
+    ushort unkCount;
     float switchPoint;
 };
 
+
 struct UnkVgData_t
 {
+    local int l = 0;
+    local string name = "";
 	/*int unk1;
 	int unk2;
-	float unk3;
+	int unk3 <read=Str("0x%x", this)>;
 	int unk4;
-	int unk5;
-	short unk6;
-	short unk7;
-	short unk8;
-	short unk9;
-	int unk10;
-	int unk11;
-	short unk12;
-	short unk13;
-	short unk14;
-	short unk15;
-	int pad;*/
-    int unk[12];
+	
+
+    local struct tmp_unk{
+        uchar a;
+        uchar b;    
+    };
+
+	tmp_unk unk5[16] <read=Str("%d, %d", this.a, this.b)>;*/
+    for (l = 0; l<48; l++){
+        char unk;
+        name += Str("0x%02x ", unk & 0xFF);
+    }
 };
         
 struct VertexGroupHeader_t{
@@ -156,6 +158,33 @@ struct VertexGroupHeader_t{
     __int64 stripCount;     // number of strips (size: 0x23)
     
     __int64 unused[8];  
+};
+struct mstudioweightextra_t
+{
+	short weight[3]; // value divided by 32767.0
+
+	short pad; // likely alignment
+
+	int extraweightindex; // base index for vvw, add (weightIdx - 3)
+};
+
+struct mstudioboneweight_t
+{
+	union
+	{
+		float	weight[3];
+		mstudioweightextra_t weightextra; // only in apex (v54)
+	} weight_shared; // we have to have a member name in 010
+
+	unsigned char bone[3]; // set to unsigned so we can read it
+	char	numbones;
+};
+struct mstudiovertex_t
+{
+	mstudioboneweight_t	m_BoneWeights;
+	Vector m_vecPosition;
+	Vector m_vecNormal;
+	Vector2D m_vecTexCoord;
 };
 
 enum <ubyte> StripHeaderFlags_t
@@ -208,16 +237,28 @@ for(i = 0; i < hdr.meshCount; i++){
             
             FSeek(hdr.indicesOffset + meshHdr.indicesOffset * 2 + strip.indicesOffset * 2);
             struct{
-                for(k = 0; k < strip.indicesCount/2; k++){
-                    struct{
-                        short start;
-                        short end;
-                    } indice <read=Str("%d -> %d", this.start, this.end)>; //[meshHdr.indicesCount/2]
+                local int count;
+                if(strip.flags & 0x1){
+                    count = strip.indicesCount/3;
+                    for(k = 0; k < count; k++){
+                        struct{
+                            short a <hidden=true, bgcolor=(0x882444 - 0x111111)>;
+                            short b <hidden=true, bgcolor=0x882444>;
+                            short c <hidden=true, bgcolor=(0x882444 + 0x111111)>;
+                        } tri <read=Str("%d, %d, %d", this.a, this.b, this.c)>; //[meshHdr.indicesCount/2]
+                    }
+                }else{
+                    count = strip.indicesCount;
+                    for(k = 0; k < count; k++){
+                        short indice;
+                    }
                 }
-            }indices<bgcolor=0x882444>;
+            }indices<name=Str("indeces[%d] ", this.count)>;
             
             FSeek(hdr.vertOffset + meshHdr.vertOffset + strip.vertOffset);
             struct{
+                local int count <hidden=true>;
+                count = strip.vertCount;
                 for(k = 0; k < strip.vertCount; k++){
                     struct{
                         if(meshHdr.flags & 0x1) Vector m_vecPosition;
@@ -232,7 +273,7 @@ for(i = 0; i < hdr.meshCount; i++){
                         //bbmax_x = Max(bbmax_x, (this.m_vecPositionPacked.z - 2097152.) * (1024. / 1048576.5));
                     }vert ; //[meshHdr.vertCount]
                 }
-            }vertices <bgcolor=0x244488>;
+            }vertices <bgcolor=0x244488,name=Str("vertices[%d] ", this.count)>;
         }
     }mesh;
 }
@@ -242,7 +283,7 @@ FSeek(hdr.extraBoneWeightSize);
 //
 
 FSeek(hdr.unknownOffset);
-UnkVgData_t unkVgData[hdr.unknownCount] <bgcolor=0x248844>;
+UnkVgData_t unkVgData[hdr.unknownCount] <bgcolor=0x248844,read=Str("%s", this.name)>;
 
 FSeek(hdr.lodOffset);
 LodHdr_t lodHdr[hdr.lodCount] <bgcolor=0xAA8824>;
